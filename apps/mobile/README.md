@@ -1,5 +1,9 @@
 # Welcome to your Expo app 👋
 
+## Clerk authentication
+
+Create a local `.env` file from `.env.example` and set the publishable key from the Clerk dashboard before starting the app.
+
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started
