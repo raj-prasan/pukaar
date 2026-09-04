@@ -27,7 +27,8 @@ export default defineSchema({
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_role", ["role"])
-    .index("by_camp", ["campId"]),
+    .index("by_camp", ["campId"])
+    .index("by_camp_and_role", ["campId", "role"]),
 
   camps: defineTable({
     name: v.string(),
@@ -89,7 +90,7 @@ export default defineSchema({
   })
     .index("by_reporter", ["reporterId"])
     .index("by_incident", ["incidentId"])
-    .index("by_status", ["verificationStatus"])
+    .index("by_verification_status", ["verificationStatus"])
     .index("by_category", ["category"])
     .index("by_created_at", ["createdAt"]),
 

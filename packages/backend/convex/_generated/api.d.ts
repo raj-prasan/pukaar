@@ -8,7 +8,15 @@
  * @module
  */
 
+import type * as http from "../http.js";
 import type * as myFunctions from "../myFunctions.js";
+import type * as private_auth from "../private/auth.js";
+import type * as private_incidents from "../private/incidents.js";
+import type * as private_reports from "../private/reports.js";
+import type * as private_users from "../private/users.js";
+import type * as public_incidents from "../public/incidents.js";
+import type * as public_reports from "../public/reports.js";
+import type * as public_users from "../public/users.js";
 
 import type {
   ApiFromModules,
@@ -17,7 +25,15 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  http: typeof http;
   myFunctions: typeof myFunctions;
+  "private/auth": typeof private_auth;
+  "private/incidents": typeof private_incidents;
+  "private/reports": typeof private_reports;
+  "private/users": typeof private_users;
+  "public/incidents": typeof public_incidents;
+  "public/reports": typeof public_reports;
+  "public/users": typeof public_users;
 }>;
 
 /**
