@@ -46,8 +46,8 @@ export default defineSchema({
         v.literal("available"),
         v.literal("assigned"),
         v.literal("offline"),
-        v.literal("on_duty")
-      )
+        v.literal("on_duty"),
+      ),
     ),
 
     isActive: v.boolean(),
@@ -58,6 +58,26 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_camp", ["campId"])
     .index("by_status", ["status"]),
+
+  volunteerRoleRequests: defineTable({
+    requesterId: v.id("users"),
+
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+    ),
+
+    reviewedBy: v.optional(v.id("users")),
+    note: v.optional(v.string()),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    reviewedAt: v.optional(v.number()),
+  })
+    .index("by_requester", ["requesterId"])
+    .index("by_status", ["status"])
+    .index("by_requester_and_status", ["requesterId", "status"]),
 
   camps: defineTable({
     name: v.string(),
@@ -90,7 +110,7 @@ export default defineSchema({
       v.literal("road_blocked"),
       v.literal("building_damage"),
       v.literal("missing_person"),
-      v.literal("other")
+      v.literal("other"),
     ),
 
     title: v.string(),
@@ -102,8 +122,8 @@ export default defineSchema({
         v.literal("low"),
         v.literal("medium"),
         v.literal("high"),
-        v.literal("critical")
-      )
+        v.literal("critical"),
+      ),
     ),
 
     latitude: v.number(),
@@ -118,7 +138,7 @@ export default defineSchema({
     verificationStatus: v.union(
       v.literal("pending"),
       v.literal("verified"),
-      v.literal("rejected")
+      v.literal("rejected"),
     ),
 
     // If this report is associated with an incident.
@@ -133,7 +153,7 @@ export default defineSchema({
     .index("by_category", ["category"])
     .index("by_created_at", ["createdAt"]),
 
-    incidents: defineTable({
+  incidents: defineTable({
     title: v.string(),
     description: v.string(),
 
@@ -146,7 +166,7 @@ export default defineSchema({
       v.literal("road_blocked"),
       v.literal("building_damage"),
       v.literal("missing_person"),
-      v.literal("other")
+      v.literal("other"),
     ),
 
     latitude: v.number(),
@@ -159,7 +179,7 @@ export default defineSchema({
       v.literal("low"),
       v.literal("medium"),
       v.literal("high"),
-      v.literal("critical")
+      v.literal("critical"),
     ),
 
     // Incident lifecycle.
@@ -170,14 +190,14 @@ export default defineSchema({
       v.literal("active"),
       v.literal("contained"),
       v.literal("resolved"),
-      v.literal("false_alarm")
+      v.literal("false_alarm"),
     ),
 
     // How reliable the incident currently is.
     verificationStatus: v.union(
       v.literal("unverified"),
       v.literal("verified"),
-      v.literal("outdated")
+      v.literal("outdated"),
     ),
 
     // Number of reports consolidated into this incident.
@@ -205,7 +225,7 @@ export default defineSchema({
     status: v.union(
       v.literal("unverified"),
       v.literal("verified"),
-      v.literal("outdated")
+      v.literal("outdated"),
     ),
 
     note: v.optional(v.string()),
@@ -213,18 +233,14 @@ export default defineSchema({
     verifiedBy: v.id("users"),
 
     createdAt: v.number(),
-  })
-    .index("by_incident", ["incidentId"]),
-   assistanceRequests: defineTable({
+  }).index("by_incident", ["incidentId"]),
+  assistanceRequests: defineTable({
     requesterId: v.id("users"),
 
     incidentId: v.optional(v.id("incidents")),
 
     // SOS vs normal assistance.
-    requestType: v.union(
-      v.literal("assistance"),
-      v.literal("sos")
-    ),
+    requestType: v.union(v.literal("assistance"), v.literal("sos")),
 
     category: v.union(
       v.literal("medical"),
@@ -234,7 +250,7 @@ export default defineSchema({
       v.literal("evacuation"),
       v.literal("rescue"),
       v.literal("medicine"),
-      v.literal("other")
+      v.literal("other"),
     ),
 
     description: v.string(),
@@ -253,7 +269,7 @@ export default defineSchema({
       v.literal("low"),
       v.literal("medium"),
       v.literal("high"),
-      v.literal("critical")
+      v.literal("critical"),
     ),
 
     status: v.union(
@@ -264,7 +280,7 @@ export default defineSchema({
       v.literal("in_progress"),
       v.literal("arrived"),
       v.literal("resolved"),
-      v.literal("cancelled")
+      v.literal("cancelled"),
     ),
 
     assignedCampId: v.optional(v.id("camps")),
@@ -289,15 +305,14 @@ export default defineSchema({
       v.literal("evacuation"),
       v.literal("medicine"),
       v.literal("danger"),
-      v.literal("other")
+      v.literal("other"),
     ),
 
     latitude: v.number(),
     longitude: v.number(),
 
     createdAt: v.number(),
-  })
-    .index("by_request", ["requestId"]),
+  }).index("by_request", ["requestId"]),
 
   dispatches: defineTable({
     requestId: v.id("assistanceRequests"),
@@ -313,7 +328,7 @@ export default defineSchema({
       v.literal("en_route"),
       v.literal("arrived"),
       v.literal("completed"),
-      v.literal("cancelled")
+      v.literal("cancelled"),
     ),
 
     // Optional coordinator instructions.
@@ -360,7 +375,7 @@ export default defineSchema({
       v.literal("medical"),
       v.literal("volunteer"),
       v.literal("road"),
-      v.literal("other")
+      v.literal("other"),
     ),
 
     description: v.optional(v.string()),
@@ -383,8 +398,8 @@ export default defineSchema({
       v.union(
         v.literal("open"),
         v.literal("partially_blocked"),
-        v.literal("blocked")
-      )
+        v.literal("blocked"),
+      ),
     ),
 
     contactMethod: v.optional(
@@ -392,8 +407,8 @@ export default defineSchema({
         v.literal("phone"),
         v.literal("email"),
         v.literal("in_person"),
-        v.literal("none")
-      )
+        v.literal("none"),
+      ),
     ),
 
     contactValue: v.optional(v.string()),
@@ -403,7 +418,7 @@ export default defineSchema({
       v.literal("unverified"),
       v.literal("verified"),
       v.literal("unavailable"),
-      v.literal("outdated")
+      v.literal("outdated"),
     ),
 
     providerId: v.optional(v.id("users")),
@@ -442,7 +457,7 @@ export default defineSchema({
       v.literal("first_aid"),
       v.literal("blanket"),
       v.literal("equipment"),
-      v.literal("other")
+      v.literal("other"),
     ),
 
     quantity: v.number(),
@@ -470,11 +485,7 @@ export default defineSchema({
 
     campId: v.id("camps"),
 
-    type: v.union(
-      v.literal("in"),
-      v.literal("out"),
-      v.literal("adjustment")
-    ),
+    type: v.union(v.literal("in"), v.literal("out"), v.literal("adjustment")),
 
     quantity: v.number(),
 
@@ -529,7 +540,7 @@ export default defineSchema({
       v.literal("in_progress"),
       v.literal("arrived"),
       v.literal("resolved"),
-      v.literal("cancelled")
+      v.literal("cancelled"),
     ),
 
     note: v.optional(v.string()),

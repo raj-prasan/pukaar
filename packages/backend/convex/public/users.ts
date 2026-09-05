@@ -78,23 +78,34 @@ export const ensureCurrentUserProfile = mutation({
 
 export const requestVolunteerRole = mutation({
   args: {},
-  handler: async(ctx, args)=>{
+  handler: async (ctx) => {
     const user = await getCurrentUser(ctx);
 
-    if (!user) {
-      throw new Error("Unauthenticated");
+    if (user.role === "volunteer") {
+      throw new Error("User is already a volunteer.");
     }
 
-    if(user.role === "volunteer"){
-      throw new Error("User is already a volunteer.")
+    const existingRequest = await ctx.db
+      .query("volunteerRoleRequests")
+      .withIndex("by_requester_and_status", (q) =>
+        q.eq("requesterId", user._id).eq("status", "pending")
+      )
+      .unique();
+
+    if (existingRequest) {
+      throw new Error("A volunteer role request is already pending.");
     }
-    else{
-      await ctx.runMutation(internal.private.users.promoteToVolunteer, {
-        userId: user._id,
-      })
-    }
-  }
-})
+
+    const now = Date.now();
+
+    return await ctx.db.insert("volunteerRoleRequests", {
+      requesterId: user._id,
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
 
 export const completeOnboarding = mutation({
   args: {
