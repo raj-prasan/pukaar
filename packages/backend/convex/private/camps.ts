@@ -1,5 +1,7 @@
-import { QueryCtx, MutationCtx } from "../_generated/server";
+import { QueryCtx, MutationCtx, mutation } from "../_generated/server";
+import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
+import { getCurrentUser } from "./auth";
 
 export function calculateDistanceKm(
   lat1: number,
@@ -61,3 +63,46 @@ export async function findNearestCamp(
 
   return nearestCamp._id;
 }
+
+// Mutation to create a relief camp for a coordinator during onboarding/first signup
+export const createCoordinatorCamp = mutation({
+  args: {
+    name: v.string(),
+    address: v.string(),
+    city: v.optional(v.string()),
+    latitude: v.number(),
+    longitude: v.number(),
+    contactPhone: v.optional(v.string()),
+  },
+
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+
+    const now = Date.now();
+    const code = Math.floor(100000 + Math.random() * 900000);
+    const campId = await ctx.db.insert("camps", {
+      name: args.name.trim(),
+      address: args.address.trim(),
+      city: args.city?.trim() || undefined,
+      latitude: args.latitude,
+      longitude: args.longitude,
+      contactPhone: args.contactPhone?.trim() || undefined,
+      status: "active",
+      createdBy: user._id,
+      createdAt: now,
+      updatedAt: now,
+      uniqueCode: code,
+    });
+    
+    // Link camp to user profile and ensure role is coordinator
+    await ctx.db.patch(user._id, {
+      role: user.role === "user" ? "coordinator" : user.role,
+      campId: campId,
+      onboardingCompleted: true,
+      updatedAt: now,
+      
+    });
+
+    return campId;
+  },
+});
