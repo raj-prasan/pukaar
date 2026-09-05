@@ -1,19 +1,35 @@
 import type { ReactNode } from "react";
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export function AuthScreen({ children }: { children: ReactNode }) {
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>
-          Pukaar
-        </Text>
-        <Text style={styles.title}>
-          A clearer way to begin.
-        </Text>
-      </View>
-      {children}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Text style={styles.eyebrow}>Pukaar</Text>
+            <Text style={styles.title}>A clearer way to begin.</Text>
+          </View>
+          {children}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -79,6 +95,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingTop: 80,
     paddingBottom: 40,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   header: {
     marginBottom: 48,

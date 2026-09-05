@@ -46,8 +46,8 @@ export async function requireVolunteer(ctx: QueryCtx | MutationCtx) {
 export async function requireVolunteerOrCoordinator(ctx: QueryCtx | MutationCtx) {
   const user = await getCurrentUser(ctx);
 
-  if (user.role !== "volunteer" && user.role !== "coordinator") {
-    throw new Error("Volunteer access required");
+  if (user.role !== "volunteer" && user.role !== "coordinator" && user.role !== "admin") {
+    throw new Error("Volunteer, coordinator, or admin access required");
   }
 
   return user;

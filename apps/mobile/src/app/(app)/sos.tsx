@@ -1,9 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useMutation } from "convex/react";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +16,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { api } from "@backend/convex/_generated/api";
 import { theme } from "@/constants/theme";
 
 type SOSSituation = "trapped" | "injured" | "evacuation" | "medicine" | "danger" | "other";
@@ -44,7 +48,10 @@ export default function SOSScreen() {
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const [payload, setPayload] = useState<SOSPayload | null>(null);
+  const createSOS = useMutation(api.public.sos.createSOS);
 
   async function handleUseCurrentLocation() {
     setIsLocating(true);
@@ -69,7 +76,7 @@ export default function SOSScreen() {
     }
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const parsedPeopleCount = peopleCount.trim() ? Number(peopleCount) : undefined;
     const hasValidPeopleCount = parsedPeopleCount === undefined || Number.isInteger(parsedPeopleCount) && parsedPeopleCount > 0;
 
@@ -90,13 +97,28 @@ export default function SOSScreen() {
       ...(parsedPeopleCount !== undefined ? { peopleCount: parsedPeopleCount } : {}),
     };
 
-    setPayload(nextPayload);
+    setIsSubmitting(true);
+    setMessage(null);
+
+    try {
+      await createSOS(nextPayload);
+      setPayload(nextPayload);
+      setMessage("SOS submitted. Help is being coordinated.");
+    } catch (caughtError) {
+      setMessage(caughtError instanceof Error ? caughtError.message : "Unable to submit the SOS.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardView}
+      >
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
           <Pressable accessibilityLabel="Go back" accessibilityRole="button" onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={theme.colors.foreground} />
           </Pressable>
@@ -104,7 +126,7 @@ export default function SOSScreen() {
             <Text style={styles.eyebrow}>EMERGENCY SOS</Text>
             <Text style={styles.heading}>Tell us what you need</Text>
           </View>
-        </View>
+          </View>
 
         <View style={styles.warningBanner}>
           <Ionicons name="warning" size={20} color={theme.colors.destructiveForeground} />
@@ -183,10 +205,19 @@ export default function SOSScreen() {
           value={peopleCount}
         />
 
-        <Pressable accessibilityRole="button" onPress={handleSubmit} style={styles.submitButton}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={isSubmitting}
+          onPress={() => void handleSubmit()}
+          style={styles.submitButton}
+        >
           <Ionicons name="radio-outline" size={21} color={theme.colors.destructiveForeground} />
-          <Text style={styles.submitButtonText}>Prepare SOS payload</Text>
+          <Text style={styles.submitButtonText}>
+            {isSubmitting ? "Submitting SOS..." : "Submit SOS"}
+          </Text>
         </Pressable>
+
+        {message && <Text style={styles.messageText}>{message}</Text>}
 
         {payload && (
           <View style={styles.payloadBox}>
@@ -196,7 +227,8 @@ export default function SOSScreen() {
             </Text>
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -205,6 +237,9 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  keyboardView: {
+    flex: 1,
   },
   content: {
     padding: 20,
@@ -334,6 +369,13 @@ const styles = StyleSheet.create({
     color: theme.colors.destructiveForeground,
     fontSize: 14,
     fontWeight: "800",
+  },
+  messageText: {
+    marginTop: 12,
+    color: theme.colors.verified,
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
   },
   payloadBox: {
     marginTop: 16,
