@@ -1,12 +1,16 @@
   import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions, type CameraCapturedPicture } from "expo-camera";
+  import { Blob as ExpoBlob } from "expo-blob";
+  import { useMutation } from "convex/react";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
   Alert,
   Image,
+  KeyboardAvoidingView,
   Pressable,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +19,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { api } from "@backend/convex/_generated/api";
+import type { Id } from "@backend/convex/_generated/dataModel";
 import { theme } from "@/constants/theme";
 
 type IncidentCategory =
@@ -28,14 +34,14 @@ type IncidentCategory =
   | "missing_person"
   | "other";
 
-type IncidentPriority = "low" | "medium" | "high" | "critical";
+type ReportSeverity = "low" | "medium" | "high" | "critical";
 
 type IncidentPayload = {
   category: IncidentCategory;
   title: string;
   description: string;
   address: string;
-  priority: IncidentPriority;
+  severity?: ReportSeverity;
   latitude: number;
   longitude: number;
   photo: {
@@ -59,7 +65,7 @@ const categories: Array<{ value: IncidentCategory; label: string }> = [
   { value: "other", label: "Other" },
 ];
 
-const priorities: Array<{ value: IncidentPriority; label: string }> = [
+const severities: Array<{ value: ReportSeverity; label: string }> = [
   { value: "low", label: "Low" },
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
@@ -71,7 +77,7 @@ export default function ReportScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [category, setCategory] = useState<IncidentCategory | null>(null);
-  const [priority, setPriority] = useState<IncidentPriority | null>(null);
+  const [severity, setSeverity] = useState<ReportSeverity | null>(null);
   const [address, setAddress] = useState("");
   const [description, setDescription] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
@@ -79,7 +85,11 @@ export default function ReportScreen() {
   const [photo, setPhoto] = useState<CameraCapturedPicture | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const [payload, setPayload] = useState<IncidentPayload | null>(null);
+  const createReport = useMutation(api.public.reports.createReport);
+  const generateUploadUrl = useMutation(api.public.files.generateUploadUrl);
 
   async function handleUseCurrentLocation() {
     setIsLocating(true);
@@ -132,40 +142,80 @@ export default function ReportScreen() {
     }
   }
 
-  function handleSubmit() {
-    if (!category || !priority || !address.trim() || !latitude || !longitude || !photo) {
+  async function handleSubmit() {
+    if (!category || !address.trim() || latitude === null || longitude === null || !photo) {
       Alert.alert(
         "Complete the report",
-        "Select an incident type and urgency, enter the location, capture GPS coordinates, and add a photo.",
+        "Select an incident type, enter the location, capture GPS coordinates, and add a photo.",
       );
       return;
     }
 
     const selectedCategory = categories.find((item) => item.value === category);
-    const nextPayload: IncidentPayload = {
-      category,
-      title: selectedCategory?.label ?? category,
-      description: description.trim(),
-      address: address.trim(),
-      priority,
-      latitude,
-      longitude,
-      photo: {
-        uri: photo.uri,
-        width: photo.width,
-        height: photo.height,
-        format: photo.format,
-      },
-      createdAt: new Date().toISOString(),
-    };
+    setIsSubmitting(true);
+    setMessage(null);
 
-    setPayload(nextPayload);
+    try {
+      const photoResponse = await fetch(photo.uri);
+      const photoBlob = new ExpoBlob([await photoResponse.arrayBuffer()], {
+        type: photo.format ? `image/${photo.format}` : "image/jpeg",
+      });
+      const uploadUrl = await generateUploadUrl();
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": photoBlob.type || "image/jpeg" },
+        body: photoBlob as unknown as Blob,
+      });
+
+      if (!uploadResponse.ok) {
+        const responseText = await uploadResponse.text();
+        throw new Error(responseText || "Unable to upload the report photo");
+      }
+
+      const { storageId } = (await uploadResponse.json()) as { storageId: Id<"_storage"> };
+      await createReport({
+        category,
+        title: selectedCategory?.label ?? category,
+        description: description.trim(),
+        ...(severity ? { severity } : {}),
+        latitude,
+        longitude,
+        address: address.trim(),
+        imageStorageId: storageId,
+      });
+
+      setPayload({
+        category,
+        title: selectedCategory?.label ?? category,
+        description: description.trim(),
+        address: address.trim(),
+        ...(severity ? { severity } : {}),
+        latitude,
+        longitude,
+        photo: {
+          uri: photo.uri,
+          width: photo.width,
+          height: photo.height,
+          format: photo.format,
+        },
+        createdAt: new Date().toISOString(),
+      });
+      setMessage("Report submitted for review.");
+    } catch (caughtError) {
+      setMessage(caughtError instanceof Error ? caughtError.message : "Unable to submit the report.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardView}
+      >
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
           <Pressable accessibilityLabel="Go back" accessibilityRole="button" onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={theme.colors.foreground} />
           </Pressable>
@@ -173,7 +223,7 @@ export default function ReportScreen() {
             <Text style={styles.eyebrow}>INCIDENT REPORT</Text>
             <Text style={styles.heading}>Tell us what happened</Text>
           </View>
-        </View>
+          </View>
 
         <Text style={styles.sectionLabel}>Incident type</Text>
         <View style={styles.optionGrid}>
@@ -191,16 +241,16 @@ export default function ReportScreen() {
           ))}
         </View>
 
-        <Text style={styles.sectionLabel}>Urgency</Text>
+        <Text style={styles.sectionLabel}>How severe does this seem?</Text>
         <View style={styles.priorityRow}>
-          {priorities.map((item) => (
+          {severities.map((item) => (
             <Pressable
               accessibilityRole="button"
               key={item.value}
-              onPress={() => setPriority(item.value)}
-              style={[styles.priority, priority === item.value && styles.prioritySelected]}
+              onPress={() => setSeverity(item.value)}
+              style={[styles.priority, severity === item.value && styles.prioritySelected]}
             >
-              <Text style={[styles.priorityText, priority === item.value && styles.priorityTextSelected]}>
+              <Text style={[styles.priorityText, severity === item.value && styles.priorityTextSelected]}>
                 {item.label}
               </Text>
             </Pressable>
@@ -271,10 +321,19 @@ export default function ReportScreen() {
           </Pressable>
         )}
 
-        <Pressable accessibilityRole="button" onPress={handleSubmit} style={styles.submitButton}>
-          <Text style={styles.submitButtonText}>Prepare incident payload</Text>
+        <Pressable
+          accessibilityRole="button"
+          disabled={isSubmitting}
+          onPress={() => void handleSubmit()}
+          style={styles.submitButton}
+        >
+          <Text style={styles.submitButtonText}>
+            {isSubmitting ? "Submitting report..." : "Submit incident report"}
+          </Text>
           <Ionicons name="arrow-forward" size={20} color={theme.colors.primaryForeground} />
         </Pressable>
+
+        {message && <Text style={styles.messageText}>{message}</Text>}
 
         {payload && (
           <View style={styles.payloadBox}>
@@ -284,7 +343,8 @@ export default function ReportScreen() {
             </Text>
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -293,6 +353,9 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  keyboardView: {
+    flex: 1,
   },
   content: {
     padding: 20,
@@ -489,6 +552,13 @@ const styles = StyleSheet.create({
     color: theme.colors.primaryForeground,
     fontSize: 14,
     fontWeight: "800",
+  },
+  messageText: {
+    marginTop: 12,
+    color: theme.colors.verified,
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
   },
   payloadBox: {
     marginTop: 16,

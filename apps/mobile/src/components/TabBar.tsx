@@ -27,7 +27,6 @@ const BAR_HEIGHT = 72;
 
 const BAR_HORIZONTAL_MARGIN = 40;
 const BAR_HORIZONTAL_PADDING = 4;
-
 /*
  * How much smaller the active pill is than one tab.
  *
@@ -302,6 +301,7 @@ export function TabBar({
           />
         );
       })}
+
     </View>
   );
 }

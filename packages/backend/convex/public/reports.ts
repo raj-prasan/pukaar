@@ -15,6 +15,12 @@ export const createReport = mutation({
       v.literal("other")),
     title: v.string(),
     description: v.string(),
+    severity: v.optional(v.union(
+      v.literal("low"),
+      v.literal("medium"),
+      v.literal("high"),
+      v.literal("critical")
+    )),
     latitude: v.number(),
     longitude: v.number(),
     address: v.optional(v.string()),
@@ -34,6 +40,7 @@ export const createReport = mutation({
       category: args.category,
       title: args.title,
       description: args.description,
+      severity: args.severity,
 
       latitude: args.latitude,
       longitude: args.longitude,

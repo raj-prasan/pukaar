@@ -7,30 +7,21 @@ import {
   DMSans_700Bold,
   DMSans_800ExtraBold,
 } from "@expo-google-fonts/dm-sans";
-import { ConvexReactClient } from "convex/react";
-import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View } from "react-native";
 
+import ConvexClerkProvider from "@/providers/ConvexProvider";
+
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
-const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL ?? "";
+const TextWithDefaults = Text as typeof Text & {
+  defaultProps?: { style?: unknown };
+};
 
 if (!publishableKey) {
   throw new Error("Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY");
 }
-if (!convexUrl) {
-  throw new Error("Missing EXPO_PUBLIC_CONVEX_URL");
-}
-
-const convex = new ConvexReactClient(convexUrl, {
-  unsavedChangesWarning: false,
-});
-
-const TextWithDefaults = Text as typeof Text & {
-  defaultProps?: { style?: unknown };
-};
 
 function AppNavigator() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -44,16 +35,14 @@ function AppNavigator() {
   }
 
   return (
-    <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Protected guard={!isSignedIn}>
-          <Stack.Screen name="(auth)" />
-        </Stack.Protected>
-        <Stack.Protected guard={Boolean(isSignedIn)}>
-          <Stack.Screen name="(app)" />
-        </Stack.Protected>
-      </Stack>
-    </ConvexProviderWithClerk>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Protected guard={!isSignedIn}>
+        <Stack.Screen name="(auth)" />
+      </Stack.Protected>
+      <Stack.Protected guard={Boolean(isSignedIn)}>
+        <Stack.Screen name="(app)" />
+      </Stack.Protected>
+    </Stack>
   );
 }
 
@@ -90,8 +79,10 @@ export default function RootLayout() {
 
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <StatusBar style="dark" />
-      <AppNavigator />
+      <ConvexClerkProvider>
+        <StatusBar style="dark" />
+        <AppNavigator />
+      </ConvexClerkProvider>
     </ClerkProvider>
   );
 }

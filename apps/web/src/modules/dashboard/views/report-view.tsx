@@ -114,6 +114,11 @@ export  function ReportsPageView() {
                       >
                         {label(report.category)}
                       </Badge>
+                      {report.severity && (
+                        <Badge variant="outline" className="ml-2 text-xs uppercase tracking-wider">
+                          Reporter severity: {label(report.severity)}
+                        </Badge>
+                      )}
                       <h3 className="mt-2 font-semibold">{report.title}</h3>
                     </div>
                     <span className="text-xs text-muted-foreground">

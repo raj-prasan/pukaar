@@ -8,6 +8,7 @@ export default defineSchema({
 
     name: v.string(),
     email: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
     phone: v.optional(v.string()),
 
     role: v.union(
@@ -19,6 +20,9 @@ export default defineSchema({
 
     // Optional camp/base the user belongs to.
     campId: v.optional(v.id("camps")),
+
+    // Optional so existing user documents remain valid during rollout.
+    onboardingCompleted: v.optional(v.boolean()),
 
     isActive: v.boolean(),
 
@@ -91,6 +95,16 @@ export default defineSchema({
 
     title: v.string(),
     description: v.string(),
+
+    // Optional severity as observed by the reporter. Coordinators set incident priority later.
+    severity: v.optional(
+      v.union(
+        v.literal("low"),
+        v.literal("medium"),
+        v.literal("high"),
+        v.literal("critical")
+      )
+    ),
 
     latitude: v.number(),
     longitude: v.number(),
@@ -184,7 +198,7 @@ export default defineSchema({
     .index("by_category", ["category"])
     .index("by_coordinator", ["assignedCoordinatorId"])
     .index("by_updated_at", ["updatedAt"]),
-  
+
   incidentVerifications: defineTable({
     incidentId: v.id("incidents"),
 

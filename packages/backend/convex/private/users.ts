@@ -29,6 +29,7 @@ export const createFromClerk = internalMutation({
       email: args.email,
       phone: args.phone,
       role: "user",
+      onboardingCompleted: false,
 
       isActive: true,
 
@@ -93,7 +94,7 @@ export const volunteersUnderCoordinatorCamp = query({
     if(!campId){
       return [];
     }
-    
+
     return await ctx.db.query("users").withIndex("by_camp_and_role", (q)=> q.eq("campId", campId).eq("role", "volunteer")).collect()
 
   }

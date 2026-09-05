@@ -4,6 +4,12 @@
 
 Create a local `.env` file from `.env.example` and set the publishable key from the Clerk dashboard before starting the app.
 
+### Convex authentication
+
+Create a JWT template in the Clerk dashboard named `convex`. Add the custom audience (`aud`) claim with the value `convex`. Do not add `sub`; Clerk provides that reserved claim automatically. The audience must match the `applicationID` in `packages/backend/convex/auth.config.ts`.
+
+The mobile app uses the `convex` template by default. If you use another template name, set `EXPO_PUBLIC_CLERK_JWT_TEMPLATE` in the mobile `.env` file and restart Expo.
+
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started
