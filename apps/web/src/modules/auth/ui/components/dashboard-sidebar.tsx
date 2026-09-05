@@ -12,6 +12,7 @@ import {
   BellIcon,
   ShieldIcon,
   SpeakerIcon,
+  UserCheckIcon,
 } from "lucide-react"
 
 import {
@@ -80,9 +81,9 @@ const operationsItems = [
 
 const managementItems = [
   {
-    title: "Coordinator",
-    icon: ShieldIcon,
-    url: "/coordinator",
+    title: "Volunteers",
+    icon: UserCheckIcon,
+    url: "/volunteers",
   },
   {
     title: "Notifications",

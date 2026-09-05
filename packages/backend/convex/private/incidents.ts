@@ -388,11 +388,24 @@ export const getIncidentDetails = query({
     }
 
     // Fetch reports linked to this incident using index
-    const reports = await ctx.db
+    const rawReports = await ctx.db
       .query("reports")
       .withIndex("by_incident", (q) => q.eq("incidentId", args.incidentId))
       .order("desc")
       .collect();
+
+    // Enrich reports with resolved storage image URLs
+    const reports = await Promise.all(
+      rawReports.map(async (rep) => {
+        const imageUrl = rep.imageStorageId
+          ? await ctx.storage.getUrl(rep.imageStorageId)
+          : null;
+        return {
+          ...rep,
+          imageUrl,
+        };
+      }),
+    );
 
     // Fetch verification audit history using index
     const rawVerifications = await ctx.db
@@ -412,10 +425,47 @@ export const getIncidentDetails = query({
       }),
     );
 
+    // Fetch assistance requests / tasks linked to this incident using index
+    const rawTasks = await ctx.db
+      .query("assistanceRequests")
+      .withIndex("by_incident", (q) => q.eq("incidentId", args.incidentId))
+      .order("desc")
+      .collect();
+
+    const tasks = await Promise.all(
+      rawTasks.map(async (task) => {
+        const dispatches = await ctx.db
+          .query("dispatches")
+          .withIndex("by_request", (q) => q.eq("requestId", task._id))
+          .order("desc")
+          .collect();
+
+        const activeDispatch = dispatches[0] ?? null;
+        let volunteer = null;
+        if (activeDispatch) {
+          volunteer = await ctx.db.get(activeDispatch.volunteerId);
+        }
+
+        return {
+          ...task,
+          dispatch: activeDispatch,
+          volunteer: volunteer
+            ? {
+                _id: volunteer._id,
+                name: volunteer.name,
+                email: volunteer.email,
+                phone: volunteer.phone,
+              }
+            : null,
+        };
+      }),
+    );
+
     return {
       incident,
       reports,
       verifications,
+      tasks,
     };
   },
 });

@@ -320,7 +320,7 @@ export function IncidentsPageView() {
                   <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
-                      disabled={busyId === selected._id}
+                      disabled={busyId === selected._id || selected.status === "verified"}
                       onClick={() => {
                         setVerifyTargetStatus("verified");
                         setVerifyModalOpen(true);

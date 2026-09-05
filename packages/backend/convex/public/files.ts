@@ -1,5 +1,6 @@
-import { mutation } from "../_generated/server";
+import { mutation, query } from "../_generated/server";
 import { getCurrentUser } from "../private/auth";
+import { v } from "convex/values";
 
 export const generateUploadUrl = mutation({
   args: {},
@@ -9,3 +10,14 @@ export const generateUploadUrl = mutation({
     return await ctx.storage.generateUploadUrl();
   },
 });
+
+export const getFileUrl = query({
+  args: {
+    storageId: v.optional(v.id("_storage")),
+  },
+  handler: async (ctx, args) => {
+    if (!args.storageId) return null;
+    return await ctx.storage.getUrl(args.storageId);
+  },
+});
+

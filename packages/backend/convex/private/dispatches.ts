@@ -4,6 +4,7 @@ import {
   getCurrentUser,
   requireCoordinator,
 } from "./auth";
+import { findNearestCamp } from "./camps";
 
 /**
  * Coordinator/Admin dispatches a volunteer to an assistance request.
