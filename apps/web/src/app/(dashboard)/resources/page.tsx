@@ -1,7 +1,5 @@
+import { ResourcesPageView } from "@/modules/dashboard/views/resources-view";
+
 export default function ResourcesPage() {
-  return (
-    <div>
-      <h1>Resources</h1>
-    </div>
-  );
+  return <ResourcesPageView />;
 }

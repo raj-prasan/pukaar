@@ -154,13 +154,15 @@ export const assignRequest = mutation({
       throw new Error("Coordinator not found");
     }
 
-    if (coordinator.role !== "coordinator") {
+    if (coordinator.role !== "coordinator" && coordinator.role !== "admin") {
       throw new Error("Selected user is not a coordinator");
     }
 
     // Coordinator cannot assign to another camp.
     if (
       user.role === "coordinator" &&
+      coordinator.campId &&
+      user.campId &&
       coordinator.campId !== user.campId
     ) {
       throw new Error(
@@ -168,8 +170,10 @@ export const assignRequest = mutation({
       );
     }
 
+    const assignedCamp = coordinator.campId ?? user.campId;
+
     await ctx.db.patch(args.requestId, {
-      assignedCampId: coordinator.campId,
+      assignedCampId: assignedCamp,
       status: "assigned",
       updatedAt: Date.now(),
     });
@@ -185,3 +189,89 @@ export const assignRequest = mutation({
     return args.requestId;
   },
 });
+
+/**
+ * Get the current user's active assistance request or SOS with updates and dispatch details.
+ */
+export const getMyActiveRequest = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) return null;
+
+    const requests = await ctx.db
+      .query("assistanceRequests")
+      .withIndex("by_requester", (q) => q.eq("requesterId", user._id))
+      .order("desc")
+      .collect();
+
+    // Look for active request
+    const activeRequest = requests.find(
+      (r) =>
+        r.status === "submitted" ||
+        r.status === "under_review" ||
+        r.status === "assigned" ||
+        r.status === "accepted" ||
+        r.status === "in_progress" ||
+        r.status === "arrived",
+    );
+
+    if (!activeRequest) return null;
+
+    // Find dispatch if assigned
+    const dispatches = await ctx.db
+      .query("dispatches")
+      .withIndex("by_request", (q) => q.eq("requestId", activeRequest._id))
+      .collect();
+
+    const activeDispatch =
+      dispatches.find((d) => d.status !== "cancelled" && d.status !== "completed") ??
+      dispatches[0] ??
+      null;
+
+    let volunteer = null;
+    let volunteerLocation = null;
+    if (activeDispatch?.volunteerId) {
+      const volUser = await ctx.db.get(activeDispatch.volunteerId);
+      if (volUser) {
+        volunteer = {
+          _id: volUser._id,
+          name: volUser.name,
+          phone: volUser.phone,
+        };
+      }
+      const loc = await ctx.db
+        .query("volunteerLocations")
+        .withIndex("by_dispatch", (q) => q.eq("dispatchId", activeDispatch._id))
+        .unique();
+      if (loc) {
+        volunteerLocation = loc;
+      }
+    }
+
+    const camp = activeRequest.assignedCampId
+      ? await ctx.db.get(activeRequest.assignedCampId)
+      : null;
+
+    const updates = await ctx.db
+      .query("requestUpdates")
+      .withIndex("by_request", (q) => q.eq("requestId", activeRequest._id))
+      .collect();
+
+    return {
+      request: activeRequest,
+      dispatch: activeDispatch,
+      volunteer,
+      volunteerLocation,
+      camp,
+      updates: updates.sort((a, b) => b.createdAt - a.createdAt),
+    };
+  },
+});

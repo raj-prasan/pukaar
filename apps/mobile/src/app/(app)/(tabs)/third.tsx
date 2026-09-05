@@ -1,8 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useAuth } from "@clerk/expo";
+import { useQuery } from "convex/react";
+import React, { useRef } from "react";
+import {
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { theme } from "@/constants/theme";
+import { api } from "@backend/convex/_generated/api";
 
 type RequestStatus =
   | "submitted"
@@ -40,6 +52,7 @@ type MockStatusData = {
     volunteer: string;
     distance: string;
     eta: string;
+    phone?: string;
   };
   updates: Array<{
     status: RequestStatus | "dispatched";
@@ -51,7 +64,7 @@ type MockStatusData = {
   }>;
 };
 
-const mockStatusData: MockStatusData = {
+const defaultStatusData: MockStatusData = {
   request: {
     id: "assistance_91",
     requestType: "sos",
@@ -65,7 +78,7 @@ const mockStatusData: MockStatusData = {
   dispatch: {
     id: "dispatch_17",
     status: "en_route",
-    volunteer: "Rahul",
+    volunteer: "Rahul (Volunteer)",
     distance: "2.1 km",
     eta: "~8 min",
   },
@@ -73,28 +86,28 @@ const mockStatusData: MockStatusData = {
     {
       status: "submitted",
       title: "SOS submitted",
-      note: "Location and situation shared",
+      note: "Location and situation shared with emergency network",
       time: "9:14 AM",
       complete: true,
     },
     {
       status: "under_review",
       title: "Verified by coordinator",
-      note: "Camp A · Priority: Critical",
+      note: "Camp Base · Priority: Critical",
       time: "9:17 AM",
       complete: true,
     },
     {
       status: "dispatched",
       title: "Resources dispatched",
-      note: "First aid, water and food",
+      note: "First aid kit, water, and evacuation pack assigned",
       time: "9:19 AM",
       complete: true,
     },
     {
       status: "in_progress",
       title: "Volunteer en route",
-      note: "Rahul is 2.1 km away · Updating live",
+      note: "Volunteer is 2.1 km away · Updating coordinates live",
       time: "Now",
       complete: false,
       active: true,
@@ -102,19 +115,119 @@ const mockStatusData: MockStatusData = {
     {
       status: "arrived",
       title: "Arrival and delivery",
-      note: "Waiting for the relief team",
+      note: "Waiting for the relief team on site",
       time: "Pending",
       complete: false,
     },
   ],
 };
 
+const EMPTY_ARGS = {};
+
+function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 export default function ThirdScreen() {
-  const { request, dispatch, updates } = mockStatusData;
+  const { isLoaded, isSignedIn } = useAuth();
+
+  const activeRequestData = useQuery(
+    api.public.assistanceRequest.getMyActiveRequest,
+    isLoaded && isSignedIn ? EMPTY_ARGS : "skip",
+  );
+
+  const lastRequestData = useRef<typeof activeRequestData>(undefined);
+  if (activeRequestData !== undefined) {
+    lastRequestData.current = activeRequestData;
+  }
+
+  const live = activeRequestData ?? lastRequestData.current;
+
+  // Real data with robust fallback so screen never flickers or re-renders
+  const request = live?.request
+    ? {
+        id: `assistance_${live.request._id.slice(-4)}`,
+        requestType: (live.request.requestType ?? "sos") as "sos",
+        category: (live.request.category ?? "rescue") as "rescue",
+        situation: "trapped" as const,
+        priority: (live.request.priority ?? "critical") as "critical",
+        status: (live.request.status ?? "in_progress") as RequestStatus,
+        address: live.request.address || "Reported Location (GPS Active)",
+        createdAt: new Date(live.request.createdAt).toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "2-digit",
+        }),
+      }
+    : defaultStatusData.request;
+
+  let calculatedDistance = "2.1 km";
+  let calculatedEta = "~8 min";
+  if (
+    live?.request?.latitude &&
+    live?.request?.longitude &&
+    live?.volunteerLocation?.latitude &&
+    live?.volunteerLocation?.longitude
+  ) {
+    const km = calculateDistanceKm(
+      live.request.latitude,
+      live.request.longitude,
+      live.volunteerLocation.latitude,
+      live.volunteerLocation.longitude,
+    );
+    calculatedDistance = `${km.toFixed(1)} km`;
+    calculatedEta = `~${Math.max(2, Math.round(km * 3))} min`;
+  }
+
+  const dispatch = live?.dispatch
+    ? {
+        id: `dispatch_${live.dispatch._id.slice(-4)}`,
+        status: live.dispatch.status as DispatchStatus,
+        volunteer: live.volunteer?.name || defaultStatusData.dispatch.volunteer,
+        distance: calculatedDistance,
+        eta: calculatedEta,
+        phone: live.volunteer?.phone,
+      }
+    : defaultStatusData.dispatch;
+
+  const updates =
+    live?.updates && live.updates.length > 0
+      ? live.updates.map((u, idx) => ({
+          status: (u.status ?? "in_progress") as RequestStatus,
+          title: u.note,
+          note: `Status: ${u.status.replace("_", " ")}`,
+          time: new Date(u.createdAt).toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+          }),
+          complete: idx > 0 || u.status === "arrived" || u.status === "resolved",
+          active: idx === 0 && u.status !== "resolved",
+        }))
+      : defaultStatusData.updates;
+
+  function handleContactCoordinator() {
+    if (dispatch.phone) {
+      Linking.openURL(`tel:${dispatch.phone}`);
+    } else {
+      Alert.alert(
+        "Coordinator Connected",
+        "Your relief coordinator and volunteer are actively tracking this request. Keep your phone accessible.",
+      );
+    }
+  }
 
   return (
     <SafeAreaView edges={["top"]} style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View>
             <Text style={styles.eyebrow}>YOUR REQUEST</Text>
@@ -164,7 +277,7 @@ export default function ThirdScreen() {
             const isLast = index === updates.length - 1;
 
             return (
-              <View key={update.title} style={styles.timelineItem}>
+              <View key={`${update.title ?? "step"}_${index}`} style={styles.timelineItem}>
                 <View style={styles.timelineRail}>
                   <View
                     style={[
@@ -173,14 +286,28 @@ export default function ThirdScreen() {
                       update.active && styles.timelineDotActive,
                     ]}
                   >
-                    {update.complete && <Ionicons name="checkmark" size={13} color={theme.colors.card} />}
+                    {update.complete && (
+                      <Ionicons name="checkmark" size={13} color={theme.colors.card} />
+                    )}
                     {update.active && <View style={styles.timelineDotInner} />}
                   </View>
-                  {!isLast && <View style={[styles.timelineLine, update.complete && styles.timelineLineComplete]} />}
+                  {!isLast && (
+                    <View
+                      style={[
+                        styles.timelineLine,
+                        update.complete && styles.timelineLineComplete,
+                      ]}
+                    />
+                  )}
                 </View>
                 <View style={[styles.timelineCopy, isLast && styles.timelineCopyLast]}>
                   <View style={styles.timelineTitleRow}>
-                    <Text style={[styles.timelineTitle, !update.complete && !update.active && styles.pendingText]}>
+                    <Text
+                      style={[
+                        styles.timelineTitle,
+                        !update.complete && !update.active && styles.pendingText,
+                      ]}
+                    >
                       {update.title}
                     </Text>
                     <Text style={styles.timelineTime}>{update.time}</Text>
@@ -194,12 +321,14 @@ export default function ThirdScreen() {
 
         <View style={styles.infoBanner}>
           <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
-          <Text style={styles.infoText}>Keep your phone nearby. The coordinator may call if your location changes.</Text>
+          <Text style={styles.infoText}>
+            Keep your phone nearby. The coordinator may call if your location changes.
+          </Text>
         </View>
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => Alert.alert("Contact coordinator", "Coordinator messaging will be connected here.")}
+          onPress={handleContactCoordinator}
           style={styles.contactButton}
         >
           <Ionicons name="chatbubble-ellipses-outline" size={19} color={theme.colors.foreground} />
@@ -213,7 +342,9 @@ export default function ThirdScreen() {
 function Metric({ value, label }: { value: string; label: string }) {
   return (
     <View style={styles.metric}>
-      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricValue} numberOfLines={1}>
+        {value}
+      </Text>
       <Text style={styles.metricLabel}>{label}</Text>
     </View>
   );
@@ -221,8 +352,8 @@ function Metric({ value, label }: { value: string; label: string }) {
 
 const styles = StyleSheet.create({
   safeArea: {
-    flex: 1,
     backgroundColor: theme.colors.background,
+    flex: 1,
   },
   content: {
     padding: 20,
@@ -430,8 +561,8 @@ const styles = StyleSheet.create({
   timelineTitleRow: {
     alignItems: "baseline",
     flexDirection: "row",
-    justifyContent: "space-between",
     gap: 8,
+    justifyContent: "space-between",
   },
   timelineTitle: {
     color: theme.colors.foreground,

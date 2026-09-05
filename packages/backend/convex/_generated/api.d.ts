@@ -13,6 +13,7 @@ import type * as private_auth from "../private/auth.js";
 import type * as private_camps from "../private/camps.js";
 import type * as private_dispatches from "../private/dispatches.js";
 import type * as private_incidents from "../private/incidents.js";
+import type * as private_inventory from "../private/inventory.js";
 import type * as private_reports from "../private/reports.js";
 import type * as private_users from "../private/users.js";
 import type * as private_volumteerLocations from "../private/volumteerLocations.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   "private/camps": typeof private_camps;
   "private/dispatches": typeof private_dispatches;
   "private/incidents": typeof private_incidents;
+  "private/inventory": typeof private_inventory;
   "private/reports": typeof private_reports;
   "private/users": typeof private_users;
   "private/volumteerLocations": typeof private_volumteerLocations;
