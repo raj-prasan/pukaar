@@ -55,6 +55,7 @@ function ProfileGate() {
       <Stack.Screen name="profile" />
       <Stack.Screen name="report" />
       <Stack.Screen name="sos" />
+      <Stack.Screen name="volunteer" />
     </Stack>
   );
 }

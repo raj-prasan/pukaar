@@ -19,7 +19,7 @@ export const updateLocation = mutation({
   handler: async (ctx, args) => {
     const volunteer = await getCurrentUser(ctx);
 
-    if (volunteer.role !== "volunteer") {
+    if (volunteer.role !== "volunteer" && volunteer.role !== "admin") {
       throw new Error("Volunteer access required");
     }
 
@@ -29,7 +29,7 @@ export const updateLocation = mutation({
       throw new Error("Dispatch not found");
     }
 
-    if (dispatch.volunteerId !== volunteer._id) {
+    if (dispatch.volunteerId !== volunteer._id && volunteer.role !== "admin") {
       throw new Error("This dispatch is not assigned to you");
     }
 

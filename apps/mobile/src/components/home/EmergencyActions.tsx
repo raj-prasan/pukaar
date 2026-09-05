@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@clerk/expo";
 import { useMutation, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -18,6 +18,9 @@ import {
 import { theme } from "@/constants/theme";
 import { api } from "@backend/convex/_generated/api";
 
+const EMPTY_ARGS = {};
+let cachedGlobalIsVolunteer = false;
+
 export default function EmergencyActions() {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useAuth();
@@ -27,9 +30,27 @@ export default function EmergencyActions() {
   const [lockedStatus, setLockedStatus] = useState<"pending" | "approved" | null>(null);
   const [campName, setCampName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const profile = useQuery(
+    api.public.users.getCurrentUserProfile,
+    isLoaded && isSignedIn ? EMPTY_ARGS : "skip",
+  );
+  const lastProfile = useRef<NonNullable<typeof profile> | null>(null);
+  if (profile !== undefined && profile !== null) {
+    lastProfile.current = profile;
+    if (profile.role === "volunteer" || profile.role === "admin") {
+      cachedGlobalIsVolunteer = true;
+    }
+  }
+  const displayedProfile = profile ?? lastProfile.current;
+  const isVolunteer =
+    displayedProfile?.role === "volunteer" ||
+    displayedProfile?.role === "admin" ||
+    cachedGlobalIsVolunteer;
+
   const request = useQuery(
     api.public.users.getCurrentVolunteerRoleRequest,
-    isLoaded && isSignedIn && isVolunteerModalVisible ? {} : "skip",
+    isLoaded && isSignedIn && isVolunteerModalVisible ? EMPTY_ARGS : "skip",
   );
   const requestVolunteerRole = useMutation(api.public.users.requestVolunteerRole);
 
@@ -91,13 +112,25 @@ export default function EmergencyActions() {
           <Text style={styles.reportTitle}>Report incident</Text>
         </Pressable>
         <Pressable
-          accessibilityLabel="Become a volunteer"
+          accessibilityLabel={isVolunteer ? "Open Volunteer Desk" : "Become a volunteer"}
           accessibilityRole="button"
-          onPress={() => setVolunteerModalVisible(true)}
+          onPress={() => {
+            if (isVolunteer) {
+              router.push("/volunteer");
+            } else {
+              setVolunteerModalVisible(true);
+            }
+          }}
           style={[styles.actionButton, styles.volunteerButton]}
         >
-          <Ionicons name="people-outline" size={21} color={theme.colors.primaryForeground} />
-          <Text style={styles.volunteerTitle}>Become a volunteer</Text>
+          <Ionicons
+            name={isVolunteer ? "shield-checkmark" : "people-outline"}
+            size={21}
+            color={theme.colors.primaryForeground}
+          />
+          <Text style={styles.volunteerTitle}>
+            {isVolunteer ? "Volunteer Desk" : "Become a volunteer"}
+          </Text>
         </Pressable>
       </View>
       <Pressable
@@ -163,6 +196,16 @@ export default function EmergencyActions() {
                   <Text style={styles.successText}>
                     You are approved as a volunteer for {campName ?? "the selected camp"}.
                   </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => {
+                      closeVolunteerModal();
+                      router.push("/volunteer");
+                    }}
+                    style={[styles.applyButton, { marginTop: 14 }]}
+                  >
+                    <Text style={styles.applyButtonText}>Open Volunteer Desk</Text>
+                  </Pressable>
                 </View>
               ) : requestStatus === "rejected" ? (
                 <View style={styles.rejectedBox}>
