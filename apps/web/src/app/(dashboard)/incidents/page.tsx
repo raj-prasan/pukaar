@@ -1,7 +1,7 @@
-export default function IncidentsPage() {
+import { IncidentsPageView } from "@/modules/dashboard/views/incidents-view";
+
+export default function IncidentPage() {
   return (
-    <div>
-      <h1>Incidents</h1>
-    </div>
+    <IncidentsPageView/>
   );
 }

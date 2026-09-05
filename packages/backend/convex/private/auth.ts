@@ -33,10 +33,20 @@ export async function requireCoordinator(ctx: QueryCtx | MutationCtx) {
 
   return user;
 }
+
 export async function requireVolunteer(ctx: QueryCtx | MutationCtx) {
   const user = await getCurrentUser(ctx);
 
   if (user.role !== "volunteer" ) {
+    throw new Error("Volunteer access required");
+  }
+
+  return user;
+}
+export async function requireVolunteerOrCoordinator(ctx: QueryCtx | MutationCtx) {
+  const user = await getCurrentUser(ctx);
+
+  if (user.role !== "volunteer" && user.role !== "coordinator") {
     throw new Error("Volunteer access required");
   }
 

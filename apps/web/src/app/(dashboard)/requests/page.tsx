@@ -1,7 +1,7 @@
+import { RequestsPageView } from "@/modules/dashboard/views/requests-view";
+
 export default function RequestsPage() {
   return (
-    <div>
-      <h1>Requests</h1>
-    </div>
+    <RequestsPageView/>
   );
 }

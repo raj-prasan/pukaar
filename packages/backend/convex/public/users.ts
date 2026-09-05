@@ -1,7 +1,12 @@
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
+import { mutation, query } from "../_generated/server";
 import { getCurrentUser } from "../private/auth";
 import { internal } from "../_generated/api";
+
+export const getCurrentUserProfile = query({
+  args: {},
+  handler: async (ctx) => getCurrentUser(ctx),
+});
 
 export const requestVolunteerRole = mutation({
   args:{

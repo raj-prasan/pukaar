@@ -73,7 +73,7 @@ export const volunteersUnderCoordinatorCamp = query({
     const coordinator = await requireCoordinator(ctx);
     const campId = coordinator.campId;
     if(!campId){
-      throw new Error
+      return [];
     }
     return await ctx.db.query("users").withIndex("by_camp_and_role", (q)=> q.eq("campId", campId).eq("role", "volunteer")).collect()
 
