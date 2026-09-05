@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "convex/react";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -53,28 +53,46 @@ export default function SOSScreen() {
   const [payload, setPayload] = useState<SOSPayload | null>(null);
   const createSOS = useMutation(api.public.sos.createSOS);
 
-  async function handleUseCurrentLocation() {
-    setIsLocating(true);
+  useEffect(() => {
+    let isMounted = true;
 
-    try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert("Location permission needed", "Allow location access to attach GPS coordinates.");
-        return;
+    async function loadCurrentLocation() {
+      setIsLocating(true);
+
+      try {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (!permission.granted) {
+          if (isMounted) {
+            Alert.alert("Location permission needed", "Allow location access to attach GPS coordinates, then reopen SOS.");
+          }
+          return;
+        }
+
+        const currentLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+
+        if (isMounted) {
+          setLatitude(currentLocation.coords.latitude);
+          setLongitude(currentLocation.coords.longitude);
+        }
+      } catch {
+        if (isMounted) {
+          Alert.alert("Unable to get location", "Check your location settings, then reopen SOS.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLocating(false);
+        }
       }
-
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-
-      setLatitude(currentLocation.coords.latitude);
-      setLongitude(currentLocation.coords.longitude);
-    } catch {
-      Alert.alert("Unable to get location", "Try again and capture your GPS location.");
-    } finally {
-      setIsLocating(false);
     }
-  }
+
+    void loadCurrentLocation();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   async function handleSubmit() {
     const parsedPeopleCount = peopleCount.trim() ? Number(peopleCount) : undefined;
@@ -174,21 +192,7 @@ export default function SOSScreen() {
           style={[styles.input, styles.addressInput]}
           value={address}
         />
-        <Pressable
-          accessibilityRole="button"
-          disabled={isLocating}
-          onPress={handleUseCurrentLocation}
-          style={styles.locationButton}
-        >
-          <Ionicons name="locate-outline" size={20} color={theme.colors.foreground} />
-          <Text style={styles.locationButtonText}>
-            {isLocating
-              ? "Getting GPS location..."
-              : latitude !== null && longitude !== null
-                ? "GPS location captured"
-                : "Capture current GPS location"}
-          </Text>
-        </Pressable>
+        {isLocating && <Text style={styles.metaText}>Getting your current location...</Text>}
         {latitude !== null && longitude !== null && (
           <Text style={styles.metaText}>
             {latitude.toFixed(6)}, {longitude.toFixed(6)}

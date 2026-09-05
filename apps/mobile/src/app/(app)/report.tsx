@@ -4,7 +4,7 @@ import { CameraView, useCameraPermissions, type CameraCapturedPicture } from "ex
   import { useMutation } from "convex/react";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -91,28 +91,46 @@ export default function ReportScreen() {
   const createReport = useMutation(api.public.reports.createReport);
   const generateUploadUrl = useMutation(api.public.files.generateUploadUrl);
 
-  async function handleUseCurrentLocation() {
-    setIsLocating(true);
+  useEffect(() => {
+    let isMounted = true;
 
-    try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert("Location permission needed", "Allow location access to attach GPS coordinates.");
-        return;
+    async function loadCurrentLocation() {
+      setIsLocating(true);
+
+      try {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (!permission.granted) {
+          if (isMounted) {
+            Alert.alert("Location permission needed", "Allow location access to attach GPS coordinates, then reopen the report.");
+          }
+          return;
+        }
+
+        const currentLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+
+        if (isMounted) {
+          setLatitude(currentLocation.coords.latitude);
+          setLongitude(currentLocation.coords.longitude);
+        }
+      } catch {
+        if (isMounted) {
+          Alert.alert("Unable to get location", "Check your location settings, then reopen the report.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLocating(false);
+        }
       }
-
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-
-      setLatitude(currentLocation.coords.latitude);
-      setLongitude(currentLocation.coords.longitude);
-    } catch {
-      Alert.alert("Unable to get location", "Try again or enter the location manually.");
-    } finally {
-      setIsLocating(false);
     }
-  }
+
+    void loadCurrentLocation();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   async function handleOpenCamera() {
     if (!cameraPermission?.granted) {
@@ -266,22 +284,8 @@ export default function ReportScreen() {
           style={[styles.input, styles.addressInput]}
           value={address}
         />
-        <Pressable
-          accessibilityRole="button"
-          disabled={isLocating}
-          onPress={handleUseCurrentLocation}
-          style={styles.secondaryButton}
-        >
-          <Ionicons name="locate-outline" size={20} color={theme.colors.foreground} />
-          <Text style={styles.secondaryButtonText}>
-            {isLocating
-              ? "Getting GPS location..."
-              : latitude !== null && longitude !== null
-                ? "GPS location captured"
-                : "Use current GPS location"}
-          </Text>
-        </Pressable>
-        {latitude && longitude && (
+        {isLocating && <Text style={styles.metaText}>Getting your current location...</Text>}
+        {latitude !== null && longitude !== null && (
           <Text style={styles.metaText}>
             {latitude.toFixed(6)}, {longitude.toFixed(6)}
           </Text>

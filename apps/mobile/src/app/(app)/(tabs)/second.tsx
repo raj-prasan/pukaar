@@ -30,10 +30,17 @@ type MapLocation = {
 const DEFAULT_CAMP_RADIUS_KM = 25;
 
 const priorityColors = {
-  low: "#5f8f72",
-  medium: "#b27a1d",
+  low: theme.colors.verified,
+  medium: theme.colors.accent,
   high: "#c35c35",
-  critical: "#b7352d",
+  critical: theme.colors.destructive,
+} as const;
+
+const priorityIcons = {
+  low: "information-circle-outline",
+  medium: "warning-outline",
+  high: "alert-circle-outline",
+  critical: "flame-outline",
 } as const;
 
 function createMapHtml() {
@@ -365,23 +372,42 @@ export default function IncidentsScreen() {
           </View>
           {incidents?.map((incident) => (
             <View key={incident._id} style={styles.incidentCard}>
-              <View style={[styles.priorityBar, { backgroundColor: priorityColors[incident.priority] }]} />
               <View style={styles.incidentBody}>
                 <View style={styles.incidentHeading}>
-                  <Text style={styles.incidentTitle}>{incident.title}</Text>
-                  <Text style={styles.time}>{formatUpdatedAt(incident.updatedAt)}</Text>
+                  <View style={[styles.priorityIcon, { backgroundColor: `${priorityColors[incident.priority]}20` }]}>
+                    <Ionicons
+                      name={priorityIcons[incident.priority]}
+                      size={18}
+                      color={priorityColors[incident.priority]}
+                    />
+                  </View>
+                  <View style={styles.titleCopy}>
+                    <Text style={styles.incidentTitle}>{incident.title}</Text>
+                    <Text style={styles.time}>{formatUpdatedAt(incident.updatedAt)}</Text>
+                  </View>
                 </View>
                 <Text style={styles.description}>{incident.description}</Text>
                 <View style={styles.tags}>
-                  <Text style={[styles.tag, { color: priorityColors[incident.priority] }]}>
+                  <Text
+                    style={[
+                      styles.tag,
+                      {
+                        color: priorityColors[incident.priority],
+                        backgroundColor: `${priorityColors[incident.priority]}18`,
+                      },
+                    ]}
+                  >
                     {incident.priority.toUpperCase()}
                   </Text>
                   <Text style={styles.tagMuted}>{formatCategory(incident.category)}</Text>
                   <Text style={styles.tagMuted}>{incident.reportCount} reports</Text>
                 </View>
-                <Text style={styles.location}>
-                  {incident.address ?? "Location pending"} · {incident.status.replace("_", " ")}
-                </Text>
+                <View style={styles.locationRow}>
+                  <Ionicons name="location-outline" size={14} color={theme.colors.mutedForeground} />
+                  <Text style={styles.location}>
+                    {incident.address ?? "Location pending"} · {incident.status.replace("_", " ")}
+                  </Text>
+                </View>
               </View>
             </View>
           ))}
@@ -434,17 +460,17 @@ export default function IncidentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f7f9f3" },
-  header: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 16 },
-  eyebrow: { color: "#c35c35", fontSize: 12, fontWeight: "700", letterSpacing: 1.5 },
-  title: { color: "#1e2925", fontSize: 32, fontWeight: "800", lineHeight: 38, marginTop: 5 },
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
+  eyebrow: { color: theme.colors.destructive, fontSize: 11, fontWeight: "800", letterSpacing: 1 },
+  title: { color: theme.colors.foreground, fontSize: 28, fontWeight: "800", lineHeight: 34, marginTop: 4 },
   segmentedControl: {
     flexDirection: "row",
     marginHorizontal: 20,
     marginBottom: 16,
     padding: 4,
-    borderRadius: 10,
-    backgroundColor: "#eceee8",
+    borderRadius: 12,
+    backgroundColor: theme.colors.muted,
   },
   segment: {
     flex: 1,
@@ -453,35 +479,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
-    borderRadius: 7,
+    borderRadius: 8,
   },
-  activeSegment: { backgroundColor: "#ffffff" },
-  segmentText: { color: "#5f625d", fontSize: 13, fontWeight: "600" },
-  activeSegmentText: { color: "#000000" },
-  listContent: { paddingHorizontal: 20, paddingBottom: 24 },
+  activeSegment: { backgroundColor: theme.colors.card },
+  segmentText: { color: theme.colors.mutedForeground, fontSize: 13, fontWeight: "600" },
+  activeSegmentText: { color: theme.colors.foreground },
+  listContent: { paddingHorizontal: 20, paddingBottom: 100 },
   summaryRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
-  summary: { color: "#1e2925", fontSize: 14, fontWeight: "700" },
-  summaryMuted: { color: "#7b8179", fontSize: 12 },
-  emptyText: { color: "#7b8179", fontSize: 13, paddingVertical: 24, textAlign: "center" },
+  summary: { color: theme.colors.foreground, fontSize: 14, fontWeight: "700" },
+  summaryMuted: { color: theme.colors.primary, fontSize: 11, fontWeight: "700" },
+  emptyText: { color: theme.colors.mutedForeground, fontSize: 13, paddingVertical: 24, textAlign: "center" },
   incidentCard: {
-    flexDirection: "row",
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#d9ddd5",
-    borderRadius: 14,
-    backgroundColor: "#ffffff",
-    overflow: "hidden",
+    borderWidth: theme.borderWidth,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.card,
+    backgroundColor: theme.colors.card,
   },
-  priorityBar: { width: 4 },
-  incidentBody: { flex: 1, padding: 14 },
-  incidentHeading: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  incidentTitle: { flex: 1, color: "#1e2925", fontSize: 15, fontWeight: "700", lineHeight: 20 },
-  time: { color: "#7b8179", fontSize: 11 },
-  description: { color: "#5f625d", fontSize: 13, lineHeight: 19, marginTop: 5 },
-  tags: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
-  tag: { backgroundColor: "#f8ede8", borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3, fontSize: 10, fontWeight: "800" },
-  tagMuted: { color: "#687168", backgroundColor: "#eef0eb", borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3, fontSize: 10, fontWeight: "600" },
-  location: { color: "#7b8179", fontSize: 11, marginTop: 10, textTransform: "capitalize" },
+  incidentBody: { flex: 1, padding: 15 },
+  incidentHeading: { flexDirection: "row", alignItems: "center", gap: 10 },
+  priorityIcon: { width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 10 },
+  titleCopy: { flex: 1, flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 },
+  incidentTitle: { flex: 1, color: theme.colors.foreground, fontSize: 14, fontWeight: "800", lineHeight: 20 },
+  time: { color: theme.colors.mutedForeground, fontSize: 10, marginTop: 2 },
+  description: { color: theme.colors.mutedForeground, fontSize: 12, lineHeight: 18, marginTop: 10 },
+  tags: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 11 },
+  tag: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, fontSize: 9, fontWeight: "800", letterSpacing: 0.3 },
+  tagMuted: { color: theme.colors.mutedForeground, backgroundColor: theme.colors.muted, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, fontSize: 9, fontWeight: "600" },
+  locationRow: { alignItems: "center", flexDirection: "row", gap: 4, marginTop: 11 },
+  location: { color: theme.colors.mutedForeground, flex: 1, fontSize: 11, textTransform: "capitalize" },
   mapContainer: { flex: 1, marginHorizontal: 20, marginBottom: 20, overflow: "hidden", borderRadius: 16, borderWidth: 1, borderColor: "#d9ddd5", backgroundColor: "#e7ebe4" },
   map: { flex: 1 },
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#e7ebe4" },
