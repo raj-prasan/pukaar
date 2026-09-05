@@ -18,6 +18,7 @@ type TabBarButtonProps = {
 
   isFocused: boolean;
   color: string;
+  iconColor: string;
   label: string;
 
   iconName: React.ComponentProps<typeof Ionicons>["name"];
@@ -34,6 +35,7 @@ export default function TabBarButton({
   route,
   isFocused,
   color,
+  iconColor,
   label,
   iconName,
   href,
@@ -114,7 +116,7 @@ export default function TabBarButton({
        */}
       <ViewWrapper>
         <Animated.View style={[styles.icon, animatedIconStyle]}>
-          <Ionicons name={iconName} size={24} color={color} />
+          <Ionicons name={iconName} size={24} color={iconColor} />
         </Animated.View>
 
         <Animated.Text

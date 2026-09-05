@@ -15,6 +15,8 @@ import {
 
 import { useState } from "react";
 
+import { theme } from "@/constants/theme";
+
 import TabBarButton from "./TabBarButton";
 
 /* -------------------------------------------------------------------------- */
@@ -56,13 +58,13 @@ const ICONS_BY_ROUTE = {
   },
 
   second: {
-    active: "alert-circle",
-    inactive: "alert-circle-outline",
+    active: "notifications",
+    inactive: "notifications-outline",
   },
 
   third: {
-    active: "shield-checkmark",
-    inactive: "shield-checkmark-outline",
+    active: "time",
+    inactive: "time-outline",
   },
 } as const;
 
@@ -162,7 +164,7 @@ export function TabBar({
         styles.bar,
         {
           bottom:
-            Math.max(insets.bottom, 12) + 16,
+            Math.max(insets.bottom, 12) - 4,
         },
       ]}
     >
@@ -185,7 +187,8 @@ export function TabBar({
              */
             top:
               (BAR_HEIGHT - INDICATOR_HEIGHT) /
-              2,
+              2 -
+              theme.borderWidth,
 
             transform: [
               {
@@ -200,7 +203,7 @@ export function TabBar({
       {/* Tab buttons                                                       */}
       {/* ---------------------------------------------------------------- */}
 
-      {state.routes.map((route, index) => {
+      {state.routes.map((route: (typeof state.routes)[number], index: number) => {
         const { options } =
           descriptors[route.key];
 
@@ -268,8 +271,13 @@ export function TabBar({
             isFocused={isFocused}
             color={
               isFocused
-                ? "#fff5ec"
-                : "#a0a0a0"
+                ? theme.colors.foreground
+                : theme.colors.mutedForeground
+            }
+            iconColor={
+              isFocused
+                ? theme.colors.primaryForeground
+                : theme.colors.mutedForeground
             }
             label={String(label)}
             iconName={
@@ -317,12 +325,12 @@ const styles = StyleSheet.create({
     paddingHorizontal:
       BAR_HORIZONTAL_PADDING,
 
-    borderRadius: BAR_HEIGHT / 2,
+    borderRadius: theme.radius.pill,
 
-    backgroundColor: "#1c1c1c",
+    backgroundColor: theme.colors.card,
 
-    borderColor: "#333333",
-    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    borderWidth: theme.borderWidth,
 
     overflow: "hidden",
   },
@@ -333,6 +341,6 @@ const styles = StyleSheet.create({
     borderRadius:
       INDICATOR_HEIGHT / 2,
 
-    backgroundColor: "#c35c35",
+    backgroundColor: theme.colors.primary,
   },
 });

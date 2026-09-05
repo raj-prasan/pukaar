@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type TabPlaceholderProps = {
   eyebrow: string;
@@ -7,10 +8,12 @@ type TabPlaceholderProps = {
 
 export function TabPlaceholder({ eyebrow, title }: TabPlaceholderProps) {
   return (
-    <View style={styles.container}>
-      <Text style={styles.eyebrow}>{eyebrow}</Text>
-      <Text style={styles.title}>{title}</Text>
-    </View>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View>
+        <Text style={styles.eyebrow}>{eyebrow}</Text>
+        <Text style={styles.title}>{title}</Text>
+      </View>
+    </SafeAreaView>
   );
 }
 
