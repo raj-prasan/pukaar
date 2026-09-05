@@ -82,6 +82,7 @@ export default function ReportScreen() {
   const [description, setDescription] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [photo, setPhoto] = useState<CameraCapturedPicture | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
@@ -105,7 +106,6 @@ export default function ReportScreen() {
           }
           return;
         }
-
         const currentLocation = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
         });
@@ -198,6 +198,7 @@ export default function ReportScreen() {
         ...(severity ? { severity } : {}),
         latitude,
         longitude,
+        ...(locationAccuracy ? { locationAccuracy } : {}),
         address: address.trim(),
         imageStorageId: storageId,
       });

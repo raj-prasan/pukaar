@@ -23,6 +23,7 @@ export const createReport = mutation({
     )),
     latitude: v.number(),
     longitude: v.number(),
+    locationAccuracy: v.optional(v.number()),
     address: v.optional(v.string()),
     imageStorageId: v.optional(v.id("_storage")),
   },
@@ -44,6 +45,7 @@ export const createReport = mutation({
 
       latitude: args.latitude,
       longitude: args.longitude,
+      locationAccuracy: args.locationAccuracy,
       address: args.address,
 
       imageStorageId: args.imageStorageId,

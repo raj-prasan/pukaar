@@ -2,7 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import React, { useMemo } from "react";
+import React from "react";
 import { Circle, CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
 import type { Doc } from "../../../../packages/backend/convex/_generated/dataModel";
 
@@ -63,20 +63,9 @@ function Marker({
 }
 
 export function CoordinatorMap({ data }: { data?: MapData }) {
-  const center = useMemo<[number, number]>(() => {
-    const myCamp = data?.camps?.find(
-      (c) => c.isMyCamp || c._id === data?.userCampId || c.createdBy === data?.currentUserId
-    );
-    const firstCamp = data?.camps?.[0];
-    const firstIncident = data?.incidents[0];
-    const firstReport = data?.reports[0];
-    const location = myCamp ?? firstCamp ?? firstIncident ?? firstReport;
-    return location ? [location.latitude, location.longitude] : INDIA_CENTER;
-  }, [data]);
-
   return (
     <MapContainer
-      center={center}
+      center={INDIA_CENTER}
       zoom={data?.camps?.length || data?.incidents.length || data?.reports.length ? 6 : 5}
       scrollWheelZoom
       className="h-full min-h-[560px] w-full"
