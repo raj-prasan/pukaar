@@ -30,6 +30,31 @@ export default defineSchema({
     .index("by_camp", ["campId"])
     .index("by_camp_and_role", ["campId", "role"]),
 
+  // VOLUNTEERS
+  volunteers: defineTable({
+    userId: v.id("users"),
+    campId: v.optional(v.id("camps")),
+
+    phone: v.optional(v.string()),
+    skills: v.optional(v.array(v.string())),
+    status: v.optional(
+      v.union(
+        v.literal("available"),
+        v.literal("assigned"),
+        v.literal("offline"),
+        v.literal("on_duty")
+      )
+    ),
+
+    isActive: v.boolean(),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_camp", ["campId"])
+    .index("by_status", ["status"]),
+
   camps: defineTable({
     name: v.string(),
 

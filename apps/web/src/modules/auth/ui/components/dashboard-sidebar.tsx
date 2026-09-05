@@ -72,9 +72,9 @@ const operationsItems = [
     url: "/teams",
   },
   {
-    title: "Shelters",
+    title: "Shelter",
     icon: HomeIcon,
-    url: "/shelters",
+    url: "/shelter",
   },
 ]
 

@@ -10,13 +10,18 @@
 
 import type * as http from "../http.js";
 import type * as private_auth from "../private/auth.js";
+import type * as private_camps from "../private/camps.js";
+import type * as private_dispatches from "../private/dispatches.js";
 import type * as private_incidents from "../private/incidents.js";
 import type * as private_reports from "../private/reports.js";
 import type * as private_users from "../private/users.js";
+import type * as private_volumteerLocations from "../private/volumteerLocations.js";
 import type * as public_assistanceRequest from "../public/assistanceRequest.js";
 import type * as public_incidents from "../public/incidents.js";
+import type * as public_map from "../public/map.js";
 import type * as public_reports from "../public/reports.js";
 import type * as public_sos from "../public/sos.js";
+import type * as public_teams from "../public/teams.js";
 import type * as public_users from "../public/users.js";
 
 import type {
@@ -28,13 +33,18 @@ import type {
 declare const fullApi: ApiFromModules<{
   http: typeof http;
   "private/auth": typeof private_auth;
+  "private/camps": typeof private_camps;
+  "private/dispatches": typeof private_dispatches;
   "private/incidents": typeof private_incidents;
   "private/reports": typeof private_reports;
   "private/users": typeof private_users;
+  "private/volumteerLocations": typeof private_volumteerLocations;
   "public/assistanceRequest": typeof public_assistanceRequest;
   "public/incidents": typeof public_incidents;
+  "public/map": typeof public_map;
   "public/reports": typeof public_reports;
   "public/sos": typeof public_sos;
+  "public/teams": typeof public_teams;
   "public/users": typeof public_users;
 }>;
 

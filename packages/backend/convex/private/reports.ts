@@ -27,6 +27,8 @@ export const verifyReport = mutation({
       updatedAt: Date.now(),
     });
 
+    
+
     return args.reportId;
   },
 });

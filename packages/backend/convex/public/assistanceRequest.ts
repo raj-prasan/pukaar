@@ -1,6 +1,8 @@
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser, requireVolunteerOrCoordinator } from "../private/auth";
+import { findNearestCamp } from "../private/camps";
+
 // ============================================================
 // CREATE ASSISTANCE REQUEST
 // User
@@ -40,6 +42,7 @@ export const createAssistanceRequest = mutation({
 
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
+    const assignedCampId = await findNearestCamp(ctx, args.latitude, args.longitude);
 
     const requestId = await ctx.db.insert("assistanceRequests", {
       requesterId: user._id,
@@ -61,7 +64,7 @@ export const createAssistanceRequest = mutation({
 
       status: "submitted",
 
-      assignedCampId: undefined,
+      assignedCampId,
 
       createdAt: Date.now(),
       updatedAt: Date.now(),
