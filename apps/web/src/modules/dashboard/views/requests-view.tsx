@@ -40,9 +40,12 @@ export  function RequestsPageView() {
   const requests = useQuery(api.public.assistanceRequest.getPendingRequests);
   const sos = useQuery(api.public.sos.getActiveSOS);
   const volunteers = useQuery(api.private.users.volunteersUnderCoordinatorCamp);
+  const volunteerRoleRequests = useQuery(api.private.users.pendingVolunteerRoleRequests);
   const currentUser = useQuery(api.public.users.getCurrentUserProfile);
   const acknowledgeSOS = useMutation(api.public.sos.acknowledgeSOS);
   const assignRequest = useMutation(api.public.assistanceRequest.assignRequest);
+  const promoteToVolunteer = useMutation(api.private.users.promoteToVolunteer);
+  const rejectVolunteerRoleRequest = useMutation(api.private.users.rejectVolunteerRoleRequest);
 
   const runAction: ActionRunner = async (id, action, message) => {
     setBusyId(id);
@@ -99,6 +102,79 @@ export  function RequestsPageView() {
             </button>
           </Alert>
         )}
+        <Card className="rounded-none border-0 bg-card p-5 shadow-sm ring-1 ring-border md:p-6">
+          <div className="mb-5 flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-primary">
+                <Users className="size-4" />
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em]">
+                  Volunteer applications
+                </span>
+              </div>
+              <h2 className="mt-2 text-xl font-semibold">Review camp volunteers</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Verify people who applied with your camp code.
+              </p>
+            </div>
+            <Badge className="rounded-none border-transparent bg-primary/10 px-3 py-1 text-primary">
+              {volunteerRoleRequests?.length ?? "..."} pending
+            </Badge>
+          </div>
+          {volunteerRoleRequests?.length ? (
+            <div className="space-y-3">
+              {volunteerRoleRequests.map((request) => (
+                <div
+                  key={request._id}
+                  className="flex flex-col gap-4 border border-border bg-muted/20 p-4 md:flex-row md:items-center md:justify-between"
+                >
+                  <div>
+                    <p className="font-semibold">
+                      {request.requester?.name ?? "Unknown applicant"}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {request.requester?.email || request.requester?.phone || "No contact details"}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {request.campName} · Applied {time(request.createdAt)}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      disabled={busyId === request._id}
+                      onClick={() =>
+                        runAction(
+                          request._id,
+                          () => promoteToVolunteer({ volunteerRoleRequestId: request._id }),
+                          "Volunteer application approved.",
+                        )
+                      }
+                    >
+                      {busyId === request._id ? "Working..." : "Approve"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busyId === request._id}
+                      onClick={() =>
+                        runAction(
+                          request._id,
+                          () => rejectVolunteerRoleRequest({ volunteerRoleRequestId: request._id }),
+                          "Volunteer application rejected.",
+                        )
+                      }
+                      className="border-destructive/40 text-destructive"
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState label="No volunteer applications waiting for review" />
+          )}
+        </Card>
         <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
           <Card className="border-0 bg-card p-5 shadow-sm ring-1 ring-border md:p-6">
             <div className="mb-5 flex items-start justify-between gap-3">

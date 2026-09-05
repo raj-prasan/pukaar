@@ -163,7 +163,7 @@ export function TabBar({
         styles.bar,
         {
           bottom:
-            Math.max(insets.bottom, 12) - 4,
+            Math.max(insets.bottom, 12) ,
         },
       ]}
     >

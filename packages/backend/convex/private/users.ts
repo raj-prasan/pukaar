@@ -51,6 +51,12 @@ export const promoteToVolunteer = mutation({
     if (!roleRequest) {
       throw new Error("Request Not Found");
     }
+    if (roleRequest.status !== "pending") {
+      throw new Error("This volunteer request has already been reviewed.");
+    }
+    if (coordinator.role !== "admin" && roleRequest.campId !== coordinator.campId) {
+      throw new Error("You can only review requests for your camp.");
+    }
     const user = await ctx.db.get(roleRequest.requesterId)
 
     if (!user) {
@@ -62,14 +68,18 @@ export const promoteToVolunteer = mutation({
     }
 
 
+    const now = Date.now();
+
     await ctx.db.patch(user._id, {
       role: "volunteer",
-      campId: coordinator.campId,
-      updatedAt: Date.now(),
+      campId: roleRequest.campId,
+      updatedAt: now,
     });
     await ctx.db.patch(roleRequest._id,{
       status : "approved",
-      reviewedBy: coordinator._id
+      reviewedBy: coordinator._id,
+      reviewedAt: now,
+      updatedAt: now,
     })
 
     const existingVolunteer = await ctx.db
@@ -80,18 +90,84 @@ export const promoteToVolunteer = mutation({
     if (!existingVolunteer) {
       await ctx.db.insert("volunteers", {
         userId: user._id,
-        campId: coordinator.campId,
+        campId: roleRequest.campId,
         phone: user.phone,
         status: "available",
         isActive: true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: now,
+        updatedAt: now,
       });
     }
-    
+
     return args.volunteerRoleRequestId;
   }
 })
+
+export const rejectVolunteerRoleRequest = mutation({
+  args: {
+    volunteerRoleRequestId: v.id("volunteerRoleRequests"),
+  },
+  handler: async (ctx, args) => {
+    const coordinator = await requireCoordinator(ctx);
+    const roleRequest = await ctx.db.get(args.volunteerRoleRequestId);
+
+    if (!roleRequest) {
+      throw new Error("Request Not Found");
+    }
+    if (roleRequest.status !== "pending") {
+      throw new Error("This volunteer request has already been reviewed.");
+    }
+    if (coordinator.role !== "admin" && roleRequest.campId !== coordinator.campId) {
+      throw new Error("You can only review requests for your camp.");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(roleRequest._id, {
+      status: "rejected",
+      reviewedBy: coordinator._id,
+      reviewedAt: now,
+      updatedAt: now,
+    });
+
+    return roleRequest._id;
+  },
+});
+
+export const pendingVolunteerRoleRequests = query({
+  args: {},
+  handler: async (ctx) => {
+    const coordinator = await requireCoordinator(ctx);
+    const requests = coordinator.role === "admin"
+      ? await ctx.db
+          .query("volunteerRoleRequests")
+          .withIndex("by_status_and_camp", (q) => q.eq("status", "pending"))
+          .collect()
+      : coordinator.campId
+        ? await ctx.db
+            .query("volunteerRoleRequests")
+            .withIndex("by_status_and_camp", (q) =>
+              q.eq("status", "pending").eq("campId", coordinator.campId!),
+            )
+            .collect()
+        : [];
+
+    return await Promise.all(
+      requests.map(async (request) => {
+        const [user, camp] = await Promise.all([
+          ctx.db.get(request.requesterId),
+          ctx.db.get(request.campId),
+        ]);
+        return {
+          ...request,
+          requester: user
+            ? { name: user.name, email: user.email, phone: user.phone }
+            : null,
+          campName: camp?.name ?? "Relief camp",
+        };
+      }),
+    );
+  },
+});
 
 export const volunteersUnderCoordinatorCamp = query({
   args:{
