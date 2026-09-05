@@ -7,6 +7,7 @@ import { Circle, CircleMarker, MapContainer, Popup, TileLayer } from "react-leaf
 import type { Doc } from "../../../../packages/backend/convex/_generated/dataModel";
 
 const INDIA_CENTER: [number, number] = [20.5937, 78.9629];
+const DEFAULT_CAMP_RADIUS_KM = 25;
 
 type EnrichedCamp = Doc<"camps"> & {
   isMyCamp?: boolean;
@@ -52,8 +53,8 @@ function Marker({
       pathOptions={{
         color,
         fillColor: color,
-        fillOpacity: 0.85,
-        weight: 3,
+        fillOpacity: 0.68,
+        weight: 2,
       }}
     >
       <Popup>{children}</Popup>
@@ -94,15 +95,14 @@ export function CoordinatorMap({ data }: { data?: MapData }) {
 
         return (
           <React.Fragment key={`camp-group-${camp._id}`}>
-            {/* 100 km Radius Circle (100,000 meters) */}
             <Circle
               center={[camp.latitude, camp.longitude]}
-              radius={100000}
+              radius={DEFAULT_CAMP_RADIUS_KM * 1000}
               pathOptions={{
                 color,
                 fillColor: color,
-                fillOpacity: isMyCamp ? 0.18 : 0.1,
-                weight: isMyCamp ? 2.5 : 1.5,
+                fillOpacity: isMyCamp ? 0.1 : 0.06,
+                weight: isMyCamp ? 2 : 1,
                 dashArray: isMyCamp ? undefined : "6, 6",
               }}
             />
@@ -126,7 +126,7 @@ export function CoordinatorMap({ data }: { data?: MapData }) {
                   <p className="text-xs">Phone: {camp.contactPhone}</p>
                 )}
                 <div className="mt-1 pt-1 border-t text-[11px]">
-                  Status: <span className="capitalize">{camp.status}</span> · 100 km radius
+                  Status: <span className="capitalize">{camp.status}</span> · {DEFAULT_CAMP_RADIUS_KM} km jurisdiction
                 </div>
               </div>
             </Marker>

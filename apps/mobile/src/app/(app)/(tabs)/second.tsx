@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "convex/react";
 import * as Location from "expo-location";
 import { useNavigation } from "expo-router";
 import React from "react";
@@ -14,36 +15,11 @@ import { WebView } from "react-native-webview";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { theme } from "@/constants/theme";
+import { api } from "@backend/convex/_generated/api";
+import type { Doc } from "@backend/convex/_generated/dataModel";
 
-type Incident = {
-  title: string;
-  description: string;
-  category:
-    | "flood"
-    | "fire"
-    | "landslide"
-    | "earthquake"
-    | "medical"
-    | "road_blocked"
-    | "building_damage"
-    | "missing_person"
-    | "other";
-  latitude: number;
-  longitude: number;
-  address?: string;
-  priority: "low" | "medium" | "high" | "critical";
-  status:
-    | "reported"
-    | "under_review"
-    | "verified"
-    | "active"
-    | "contained"
-    | "resolved"
-    | "false_alarm";
-  verificationStatus: "unverified" | "verified" | "outdated";
-  reportCount: number;
-  updatedAt: number;
-};
+type Incident = Doc<"incidents">;
+type Camp = Doc<"camps">;
 
 type MapLocation = {
   latitude: number;
@@ -51,47 +27,7 @@ type MapLocation = {
   accuracy: number | null;
 };
 
-const MOCK_INCIDENTS: Incident[] = [
-  {
-    title: "Flooding near Main Market",
-    description: "Water level is rising near the market entrance.",
-    category: "flood",
-    latitude: 26.7012,
-    longitude: 92.8366,
-    address: "Main Market Road",
-    priority: "critical",
-    status: "active",
-    verificationStatus: "verified",
-    reportCount: 8,
-    updatedAt: Date.now() - 2 * 60 * 1000,
-  },
-  {
-    title: "Road blocked on Bridge Road",
-    description: "Debris is blocking the road for vehicles and pedestrians.",
-    category: "road_blocked",
-    latitude: 26.6979,
-    longitude: 92.8348,
-    address: "Bridge Road",
-    priority: "high",
-    status: "verified",
-    verificationStatus: "verified",
-    reportCount: 5,
-    updatedAt: Date.now() - 22 * 60 * 1000,
-  },
-  {
-    title: "Medical assistance requested",
-    description: "A first-aid team is needed near the community hall.",
-    category: "medical",
-    latitude: 26.7031,
-    longitude: 92.839,
-    address: "Community Hall B",
-    priority: "medium",
-    status: "under_review",
-    verificationStatus: "unverified",
-    reportCount: 2,
-    updatedAt: Date.now() - 41 * 60 * 1000,
-  },
-];
+const DEFAULT_CAMP_RADIUS_KM = 25;
 
 const priorityColors = {
   low: "#5f8f72",
@@ -100,19 +36,7 @@ const priorityColors = {
   critical: "#b7352d",
 } as const;
 
-function createMapHtml(incidents: Incident[]) {
-  const incidentData = JSON.stringify(
-    incidents.map(({ title, description, category, latitude, longitude, priority, status }) => ({
-      title,
-      description,
-      category,
-      latitude,
-      longitude,
-      priority,
-      status,
-    })),
-  );
-
+function createMapHtml() {
   return `<!doctype html>
 <html>
   <head>
@@ -122,7 +46,9 @@ function createMapHtml(incidents: Incident[]) {
       html, body, #map { height: 100%; margin: 0; }
       body { overflow: hidden; }
       .leaflet-control-attribution { font-size: 9px; }
-      .user-marker { background: #208AEF; border: 3px solid white; border-radius: 50%; box-shadow: 0 1px 5px rgba(0,0,0,.35); }
+      .user-marker { align-items: center; background: #208AEF; border: 3px solid white; border-radius: 50%; box-shadow: 0 1px 5px rgba(0,0,0,.35); display: flex; height: 34px !important; justify-content: center; overflow: hidden; width: 34px !important; }
+      .user-marker img { height: 100%; object-fit: cover; width: 100%; }
+      .user-marker span { background: #208AEF; border: 2px solid white; border-radius: 50%; height: 12px; width: 12px; }
       .incident-marker { border: 2px solid white; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
     </style>
   </head>
@@ -130,45 +56,123 @@ function createMapHtml(incidents: Incident[]) {
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-      const incidents = ${incidentData};
       const priorityColors = ${JSON.stringify(priorityColors)};
-      const defaultCenter = [26.700637, 92.836052];
-      const map = L.map('map', { zoomControl: true, attributionControl: true }).setView(defaultCenter, 14);
+      const map = L.map('map', { zoomControl: true, attributionControl: true }).setView([20.5937, 78.9629], 5);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors'
       }).addTo(map);
 
-      incidents.forEach((incident) => {
-        const color = priorityColors[incident.priority] || priorityColors.medium;
-        const areaRadius = incident.priority === 'critical' ? 180 : incident.priority === 'high' ? 120 : 80;
-        L.circle([incident.latitude, incident.longitude], {
-          radius: areaRadius,
-          color,
-          fillColor: color,
-          fillOpacity: 0.1,
-          weight: 1
-        }).addTo(map);
-        const marker = L.circleMarker([incident.latitude, incident.longitude], {
-          radius: incident.priority === 'critical' ? 11 : 9,
-          color: '#ffffff',
-          weight: 2,
-          fillColor: color,
-          fillOpacity: 0.95,
-          className: 'incident-marker'
-        }).addTo(map);
-        marker.bindPopup('<strong>' + incident.title + '</strong><br>' + incident.description + '<br><small>' + incident.status.replace('_', ' ') + '</small>');
-      });
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (character) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        })[character]);
+      }
 
       let userMarker;
       let accuracyCircle;
       let hasCenteredOnUser = false;
+      let hasRenderedData = false;
+      let dataLayers = [];
+      let currentProfileImageUrl = null;
+      let currentDataSignature = '';
+
+      function clearDataLayers() {
+        dataLayers.forEach((layer) => map.removeLayer(layer));
+        dataLayers = [];
+      }
+
+      function addDataLayer(layer) {
+        dataLayers.push(layer);
+        return layer;
+      }
+
+      function renderData(incidents, camps) {
+        clearDataLayers();
+        camps.forEach((camp) => {
+          const color = '#2563a6';
+          addDataLayer(L.circle([camp.latitude, camp.longitude], {
+            radius: ${DEFAULT_CAMP_RADIUS_KM * 1000},
+            color,
+            fillColor: color,
+            fillOpacity: 0.06,
+            weight: 1,
+            dashArray: '6, 6',
+            interactive: false
+          }).addTo(map));
+          const marker = addDataLayer(L.circleMarker([camp.latitude, camp.longitude], {
+            radius: 9,
+            color: '#ffffff',
+            weight: 2,
+            fillColor: color,
+            fillOpacity: 0.72
+          }).addTo(map));
+          marker.bindPopup('<strong>' + camp.name + '</strong><br>' + (camp.address || 'Location available') + '<br><small>' + ${DEFAULT_CAMP_RADIUS_KM} + ' km jurisdiction · ' + camp.status + '</small>');
+        });
+
+        incidents.forEach((incident) => {
+          const color = priorityColors[incident.priority] || priorityColors.medium;
+          const areaRadius = incident.priority === 'critical' ? 180 : incident.priority === 'high' ? 120 : 80;
+          addDataLayer(L.circle([incident.latitude, incident.longitude], {
+            radius: areaRadius,
+            color,
+            fillColor: color,
+            fillOpacity: 0.1,
+            weight: 1,
+            interactive: false
+          }).addTo(map));
+          const marker = addDataLayer(L.circleMarker([incident.latitude, incident.longitude], {
+            radius: incident.priority === 'critical' ? 11 : 9,
+            color: '#ffffff',
+            weight: 2,
+            fillColor: color,
+            fillOpacity: 0.95,
+            className: 'incident-marker'
+          }).addTo(map));
+          marker.bindPopup('<strong>' + incident.title + '</strong><br>' + incident.description + '<br><small>' + incident.status.replace('_', ' ') + '</small>');
+        });
+
+        if (!hasRenderedData && !hasCenteredOnUser) {
+          const firstLocation = camps[0] || incidents[0];
+          if (firstLocation) map.setView([firstLocation.latitude, firstLocation.longitude], 14);
+        }
+        hasRenderedData = true;
+      }
+
+      function userIcon(profileImageUrl) {
+        return L.divIcon({
+          className: 'user-marker',
+          html: profileImageUrl
+            ? '<img src="' + escapeHtml(profileImageUrl) + '" alt="Your profile" />'
+            : '<span></span>',
+          iconSize: [34, 34],
+          iconAnchor: [17, 17]
+        });
+      }
+
+      window.setMapData = function(data) {
+        const nextProfileImageUrl = data.profileImageUrl || null;
+        const nextDataSignature = JSON.stringify({
+          incidents: data.incidents || [],
+          camps: data.camps || []
+        });
+
+        if (nextDataSignature !== currentDataSignature) {
+          currentDataSignature = nextDataSignature;
+          renderData(data.incidents || [], data.camps || []);
+        }
+        currentProfileImageUrl = nextProfileImageUrl;
+      };
 
       window.setUserLocation = function(latitude, longitude, accuracy) {
         const position = [latitude, longitude];
         if (!userMarker) {
           userMarker = L.marker(position, {
-            icon: L.divIcon({ className: 'user-marker', iconSize: [18, 18], iconAnchor: [9, 9] })
+            icon: userIcon(currentProfileImageUrl)
           }).addTo(map).bindPopup('Your current location');
         } else {
           userMarker.setLatLng(position);
@@ -197,7 +201,7 @@ function createMapHtml(incidents: Incident[]) {
 </html>`;
 }
 
-const MAP_HTML = createMapHtml(MOCK_INCIDENTS);
+const MAP_SOURCE = { html: createMapHtml() };
 
 function formatCategory(category: Incident["category"]) {
   return category.replace("_", " ");
@@ -209,12 +213,39 @@ function formatUpdatedAt(updatedAt: number) {
 }
 
 export default function IncidentsScreen() {
+  const incidents = useQuery(api.public.incidents.getActiveIncidents);
+  const camps = useQuery(api.public.camps.getActiveCamps);
+  const profile = useQuery(api.public.users.getCurrentUserProfile);
   const navigation = useNavigation();
   const webViewRef = React.useRef<WebView>(null);
   const [view, setView] = React.useState<"incidents" | "map">("incidents");
   const [mapReady, setMapReady] = React.useState(false);
   const [currentLocation, setCurrentLocation] = React.useState<MapLocation | null>(null);
   const [locationMessage, setLocationMessage] = React.useState<string | null>(null);
+  const mapData = React.useMemo(
+    () =>
+      JSON.stringify({
+        incidents: (incidents ?? []).map(({ title, description, category, latitude, longitude, priority, status }) => ({
+          title,
+          description,
+          category,
+          latitude,
+          longitude,
+          priority,
+          status,
+        })),
+        camps: (camps ?? []).map(({ name, address, city, latitude, longitude, status }) => ({
+          name,
+          address,
+          city,
+          latitude,
+          longitude,
+          status,
+        })),
+        profileImageUrl: profile?.imageUrl ?? null,
+      }),
+    [camps, incidents, profile?.imageUrl],
+  );
 
   React.useEffect(() => {
     navigation.setOptions({ swipeEnabled: view !== "map" });
@@ -224,9 +255,31 @@ export default function IncidentsScreen() {
     if (view !== "map") return;
 
     let active = true;
-    let subscription: Location.LocationSubscription | null = null;
+    let refreshInProgress = false;
 
-    async function startLocationTracking() {
+    async function refreshLocation() {
+      if (!active || refreshInProgress) return;
+      refreshInProgress = true;
+
+      try {
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+        if (!active) return;
+
+        setCurrentLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          accuracy: location.coords.accuracy,
+        });
+      } catch {
+        if (active) setLocationMessage("Unable to read your current location.");
+      } finally {
+        refreshInProgress = false;
+      }
+    }
+
+    async function startLocationRefresh() {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (!active) return;
 
@@ -236,45 +289,17 @@ export default function IncidentsScreen() {
       }
 
       setLocationMessage(null);
-      const initialLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-      if (!active) return;
-      setCurrentLocation({
-        latitude: initialLocation.coords.latitude,
-        longitude: initialLocation.coords.longitude,
-        accuracy: initialLocation.coords.accuracy,
-      });
-
-      const nextSubscription = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          distanceInterval: 10,
-          timeInterval: 5000,
-        },
-        (location) => {
-          if (!active) return;
-          setCurrentLocation({
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            accuracy: location.coords.accuracy,
-          });
-        },
-      );
-      if (!active) {
-        nextSubscription.remove();
-        return;
-      }
-      subscription = nextSubscription;
+      await refreshLocation();
     }
 
-    startLocationTracking().catch(() => {
-      if (active) setLocationMessage("Unable to read your current location.");
-    });
+    void startLocationRefresh();
+    const refreshTimer = setInterval(() => {
+      void refreshLocation();
+    }, 30_000);
 
     return () => {
       active = false;
-      subscription?.remove();
+      clearInterval(refreshTimer);
     };
   }, [view]);
 
@@ -286,6 +311,11 @@ export default function IncidentsScreen() {
       `window.setUserLocation(${latitude}, ${longitude}, ${accuracy ?? 0}); true;`,
     );
   }, [currentLocation, mapReady]);
+
+  React.useEffect(() => {
+    if (!mapReady) return;
+    webViewRef.current?.injectJavaScript(`window.setMapData(${mapData}); true;`);
+  }, [mapData, mapReady]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -328,11 +358,13 @@ export default function IncidentsScreen() {
       {view === "incidents" ? (
         <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
           <View style={styles.summaryRow}>
-            <Text style={styles.summary}>3 nearby incidents</Text>
-            <Text style={styles.summaryMuted}>Mock data</Text>
+            <Text style={styles.summary}>
+              {incidents === undefined ? "Loading incidents" : `${incidents.length} active incidents`}
+            </Text>
+            <Text style={styles.summaryMuted}>Live updates</Text>
           </View>
-          {MOCK_INCIDENTS.map((incident) => (
-            <View key={incident.title} style={styles.incidentCard}>
+          {incidents?.map((incident) => (
+            <View key={incident._id} style={styles.incidentCard}>
               <View style={[styles.priorityBar, { backgroundColor: priorityColors[incident.priority] }]} />
               <View style={styles.incidentBody}>
                 <View style={styles.incidentHeading}>
@@ -353,12 +385,15 @@ export default function IncidentsScreen() {
               </View>
             </View>
           ))}
+          {incidents?.length === 0 ? (
+            <Text style={styles.emptyText}>No active incidents reported.</Text>
+          ) : null}
         </ScrollView>
       ) : (
         <View style={styles.mapContainer}>
           <WebView
             ref={webViewRef}
-            source={{ html: MAP_HTML }}
+            source={MAP_SOURCE}
             style={styles.map}
             nestedScrollEnabled
             javaScriptEnabled
@@ -427,6 +462,7 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
   summary: { color: "#1e2925", fontSize: 14, fontWeight: "700" },
   summaryMuted: { color: "#7b8179", fontSize: 12 },
+  emptyText: { color: "#7b8179", fontSize: 13, paddingVertical: 24, textAlign: "center" },
   incidentCard: {
     flexDirection: "row",
     marginBottom: 10,
