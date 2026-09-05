@@ -64,7 +64,7 @@ function createMapHtml() {
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
       const priorityColors = ${JSON.stringify(priorityColors)};
-      const map = L.map('map', { zoomControl: true, attributionControl: true }).setView([20.5937, 78.9629], 5);
+      const map = L.map('map', { zoomControl: true, attributionControl: true }).setView([26.701723, 92.8362], 14);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors'
@@ -82,8 +82,6 @@ function createMapHtml() {
 
       let userMarker;
       let accuracyCircle;
-      let hasCenteredOnUser = false;
-      let hasRenderedData = false;
       let dataLayers = [];
       let currentProfileImageUrl = null;
       let currentDataSignature = '';
@@ -143,11 +141,6 @@ function createMapHtml() {
           marker.bindPopup('<strong>' + incident.title + '</strong><br>' + incident.description + '<br><small>' + incident.status.replace('_', ' ') + '</small>');
         });
 
-        if (!hasRenderedData && !hasCenteredOnUser) {
-          const firstLocation = camps[0] || incidents[0];
-          if (firstLocation) map.setView([firstLocation.latitude, firstLocation.longitude], 14);
-        }
-        hasRenderedData = true;
       }
 
       function userIcon(profileImageUrl) {
@@ -192,10 +185,6 @@ function createMapHtml() {
           fillOpacity: 0.12,
           weight: 1
         }).addTo(map);
-        if (!hasCenteredOnUser) {
-          map.setView(position, 15);
-          hasCenteredOnUser = true;
-        }
       };
 
       window.centerOnUser = function() {
@@ -327,7 +316,20 @@ export default function IncidentsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>LIVE UPDATES</Text>
+        <View style={styles.headerTopRow}>
+          <Text style={styles.eyebrow}>LIVE UPDATES</Text>
+          <Pressable
+            accessibilityLabel="Open volunteer tasks"
+            accessibilityRole="button"
+            onPress={() => undefined}
+            style={styles.taskButton}
+          >
+            <Ionicons name="notifications-outline" size={21} color={theme.colors.foreground} />
+            <View style={styles.taskBadge}>
+              <Text style={styles.taskBadgeText}>0</Text>
+            </View>
+          </Pressable>
+        </View>
         <Text style={styles.title}>Incidents</Text>
       </View>
 
@@ -462,8 +464,35 @@ export default function IncidentsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
+  headerTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   eyebrow: { color: theme.colors.destructive, fontSize: 11, fontWeight: "800", letterSpacing: 1 },
   title: { color: theme.colors.foreground, fontSize: 28, fontWeight: "800", lineHeight: 34, marginTop: 4 },
+  taskButton: {
+    position: "relative",
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: theme.borderWidth,
+    borderColor: theme.colors.border,
+    borderRadius: 21,
+    backgroundColor: theme.colors.card,
+  },
+  taskBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    minWidth: 17,
+    height: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+    borderRadius: 9,
+    backgroundColor: theme.colors.muted,
+    borderWidth: 1,
+    borderColor: theme.colors.card,
+  },
+  taskBadgeText: { color: theme.colors.mutedForeground, fontSize: 9, fontWeight: "800" },
   segmentedControl: {
     flexDirection: "row",
     marginHorizontal: 20,

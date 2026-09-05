@@ -78,10 +78,14 @@ export const ensureCurrentUserProfile = mutation({
 
 export const requestVolunteerRole = mutation({
   args: {
-    code: v.number()
+    code: v.number(),
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
+
+    if (!Number.isInteger(args.code) || args.code < 100000 || args.code > 999999) {
+      throw new Error("Enter a valid six-digit coordinator code.");
+    }
 
     if (user.role === "volunteer") {
       throw new Error("User is already a volunteer.");
@@ -98,9 +102,12 @@ export const requestVolunteerRole = mutation({
       throw new Error("A volunteer role request is already pending.");
     }
 
-    const camp = await ctx.db.query("camps").withIndex("by_code", (q)=> q.eq("uniqueCode", args.code)).unique();
-    if(!camp){
-      throw new Error("Camp Not Found.")
+    const camp = await ctx.db
+      .query("camps")
+      .withIndex("by_code", (q) => q.eq("uniqueCode", args.code))
+      .unique();
+    if (!camp || camp.status !== "active") {
+      throw new Error("No active relief camp was found for that code.");
     }
 
     const now = Date.now();
@@ -110,8 +117,43 @@ export const requestVolunteerRole = mutation({
       status: "pending",
       createdAt: now,
       updatedAt: now,
-      campId: camp?._id
+      campId: camp._id,
     });
+  },
+});
+
+export const getCurrentVolunteerRoleRequest = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return null;
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) {
+      return null;
+    }
+
+    const requests = await ctx.db
+      .query("volunteerRoleRequests")
+      .withIndex("by_requester", (q) => q.eq("requesterId", user._id))
+      .order("desc")
+      .collect();
+
+    const request = requests[0];
+    if (!request) {
+      return null;
+    }
+
+    const camp = await ctx.db.get(request.campId);
+    return {
+      ...request,
+      campName: camp?.name ?? "Relief camp",
+    };
   },
 });
 
