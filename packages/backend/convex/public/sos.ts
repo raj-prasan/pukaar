@@ -1,6 +1,7 @@
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser, requireVolunteerOrCoordinator,  } from "../private/auth";
+import { findNearestCamp } from "../private/camps";
 
 
 // ============================================================
@@ -31,6 +32,7 @@ export const createSOS = mutation({
 
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
+    const assignedCampId = await findNearestCamp(ctx, args.latitude, args.longitude);
 
     // First create the assistance request
     const requestId = await ctx.db.insert(
@@ -55,7 +57,7 @@ export const createSOS = mutation({
 
         status: "submitted",
 
-        assignedCampId: undefined,
+        assignedCampId,
 
         createdAt: Date.now(),
         updatedAt: Date.now(),

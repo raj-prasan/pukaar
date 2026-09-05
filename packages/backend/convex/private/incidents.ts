@@ -1,6 +1,10 @@
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
-import { getCurrentUser, requireCoordinator } from "./auth";
+import { internalMutation, mutation } from "../_generated/server";
+import {
+  getCurrentUser,
+  requireCoordinator,
+  requireVolunteerOrCoordinator,
+} from "./auth";
 
 // Create a new incident
 export const createIncidentByCoordinator = mutation({
@@ -64,7 +68,6 @@ export const createIncidentByCoordinator = mutation({
     return incidentId;
   },
 });
-
 
 export const updateIncident = mutation({
   args: {
@@ -134,5 +137,77 @@ export const updateIncident = mutation({
     await ctx.db.patch(args.incidentId, updates);
 
     return args.incidentId;
+  },
+});
+
+export const createIncidentFromReport = internalMutation({
+  args: {
+    title: v.string(),
+    description: v.string(),
+    category: v.union(
+      v.literal("flood"),
+      v.literal("fire"),
+      v.literal("landslide"),
+      v.literal("earthquake"),
+      v.literal("medical"),
+      v.literal("road_blocked"),
+      v.literal("building_damage"),
+      v.literal("missing_person"),
+      v.literal("other"),
+    ),
+
+    latitude: v.number(),
+    longitude: v.number(),
+
+    address: v.optional(v.string()),
+
+    priority: v.union(
+      v.literal("low"),
+      v.literal("medium"),
+      v.literal("high"),
+      v.literal("critical"),
+    ),
+    status: v.union(
+      v.literal("reported"),
+      v.literal("under_review"),
+      v.literal("verified"),
+      v.literal("active"),
+      v.literal("contained"),
+      v.literal("resolved"),
+      v.literal("false_alarm"),
+    ),
+    verificationStatus: v.union(
+      v.literal("unverified"),
+      v.literal("verified"),
+      v.literal("outdated"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireCoordinator(ctx);
+    await ctx.db.insert("incidents", {
+      title: args.title,
+      description: args.description,
+      category: args.category,
+
+      latitude: args.latitude,
+      longitude: args.longitude,
+      address: args.address,
+
+      priority: args.priority,
+
+      status: "verified",
+      verificationStatus: "unverified",
+
+      reportCount: 0,
+
+      assignedCoordinatorId: user.role === "coordinator" ? user._id : undefined,
+
+      verifiedBy: undefined,
+      verifiedAt: undefined,
+
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      resolvedAt: undefined,
+    });
   },
 });

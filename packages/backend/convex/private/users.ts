@@ -61,6 +61,23 @@ export const promoteToVolunteer = internalMutation({
       updatedAt: Date.now(),
     });
 
+    const existingVolunteer = await ctx.db
+      .query("volunteers")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .unique();
+
+    if (!existingVolunteer) {
+      await ctx.db.insert("volunteers", {
+        userId: args.userId,
+        campId: coordinator.campId,
+        phone: user.phone,
+        status: "available",
+        isActive: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    }
+
     return args.userId;
   }
 })
@@ -72,9 +89,11 @@ export const volunteersUnderCoordinatorCamp = query({
   handler:async(ctx, args)=>{
     const coordinator = await requireCoordinator(ctx);
     const campId = coordinator.campId;
+    console.log(campId)
     if(!campId){
       return [];
     }
+    
     return await ctx.db.query("users").withIndex("by_camp_and_role", (q)=> q.eq("campId", campId).eq("role", "volunteer")).collect()
 
   }
