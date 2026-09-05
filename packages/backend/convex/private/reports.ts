@@ -64,10 +64,19 @@ export const getReportsByIncident = query({
       throw new Error("UNAUTHORIZED");
     }
 
-    return await ctx.db
+    const rawReports = await ctx.db
       .query("reports")
       .withIndex("by_incident", (q) => q.eq("incidentId", args.incidentId))
       .order("desc")
       .collect();
+
+    return await Promise.all(
+      rawReports.map(async (rep) => ({
+        ...rep,
+        imageUrl: rep.imageStorageId
+          ? await ctx.storage.getUrl(rep.imageStorageId)
+          : null,
+      }))
+    );
   },
 });

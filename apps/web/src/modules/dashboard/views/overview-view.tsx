@@ -58,6 +58,7 @@ export default function OverviewPageView() {
               Live data
             </span>
             <Button
+              nativeButton={false}
               render={<Link href="/incidents" />}
               className="h-10 gap-2 rounded-none px-4"
             >
@@ -153,6 +154,7 @@ export function OverviewView({
             <Button
               variant="ghost"
               size="sm"
+              nativeButton={false}
               render={<Link href="/incidents" />}
               className="gap-1 text-primary"
             >
@@ -377,6 +379,7 @@ function QueueCard({
       <Button
         variant="ghost"
         size="sm"
+        nativeButton={false}
         render={<Link href={href} />}
         className="mt-3 gap-1 px-0 text-primary hover:bg-transparent hover:text-primary/80"
       >

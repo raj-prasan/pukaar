@@ -170,18 +170,26 @@ export const pendingVolunteerRoleRequests = query({
 });
 
 export const volunteersUnderCoordinatorCamp = query({
-  args:{
-
-  },
-  handler:async(ctx, args)=>{
+  args: {},
+  handler: async (ctx) => {
     const coordinator = await requireCoordinator(ctx);
     const campId = coordinator.campId;
-    console.log(campId)
-    if(!campId){
+    if (!campId) {
+      if (coordinator.role === "admin") {
+        return await ctx.db
+          .query("users")
+          .withIndex("by_role", (q) => q.eq("role", "volunteer"))
+          .collect();
+      }
       return [];
     }
 
-    return await ctx.db.query("users").withIndex("by_camp_and_role", (q)=> q.eq("campId", campId).eq("role", "volunteer")).collect()
+    return await ctx.db
+      .query("users")
+      .withIndex("by_camp_and_role", (q) =>
+        q.eq("campId", campId).eq("role", "volunteer"),
+      )
+      .collect();
+  },
+});
 
-  }
-})
