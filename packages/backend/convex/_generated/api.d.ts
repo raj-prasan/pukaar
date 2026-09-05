@@ -17,6 +17,7 @@ import type * as private_reports from "../private/reports.js";
 import type * as private_users from "../private/users.js";
 import type * as private_volumteerLocations from "../private/volumteerLocations.js";
 import type * as public_assistanceRequest from "../public/assistanceRequest.js";
+import type * as public_camps from "../public/camps.js";
 import type * as public_incidents from "../public/incidents.js";
 import type * as public_map from "../public/map.js";
 import type * as public_reports from "../public/reports.js";
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   "private/users": typeof private_users;
   "private/volumteerLocations": typeof private_volumteerLocations;
   "public/assistanceRequest": typeof public_assistanceRequest;
+  "public/camps": typeof public_camps;
   "public/incidents": typeof public_incidents;
   "public/map": typeof public_map;
   "public/reports": typeof public_reports;

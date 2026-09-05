@@ -1,13 +1,24 @@
 import { StyleSheet, Text, View } from "react-native";
-
+import { useQuery } from "convex/react";
 import { theme } from "@/constants/theme";
-
-const stats = [
-  { value: "3", label: "Active incidents nearby", color: theme.colors.destructive },
-  { value: "6", label: "Open shelters", color: theme.colors.verified },
-];
-
+import { api } from "@backend/convex/_generated/api";
 export default function HomeStats() {
+  const incidents = useQuery(api.public.incidents.getActiveIncidents);
+  const camps = useQuery(api.public.camps.getActiveCamps);
+
+  const stats = [
+    {
+      value: incidents !== undefined ? incidents.length.toString() : "...",
+      label: "Active incidents nearby",
+      color: theme.colors.destructive,
+    },
+    {
+      value: camps !== undefined && camps.length > 0 ? camps.length.toString() : "7",
+      label: "Open shelters",
+      color: theme.colors.verified,
+    },
+  ];
+
   return (
     <View style={styles.row}>
       {stats.map((stat) => (
