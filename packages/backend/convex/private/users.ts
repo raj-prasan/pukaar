@@ -39,37 +39,47 @@ export const createFromClerk = internalMutation({
   },
 });
 
-export const promoteToVolunteer = internalMutation({
+export const promoteToVolunteer = mutation({
   args: {
-    userId: v.id("users")
+    volunteerRoleRequestId: v.id("volunteerRoleRequests")
   },
   handler: async(ctx, args)=>{
     const coordinator = await requireCoordinator(ctx);
 
-    const user = await ctx.db.get(args.userId);
+    const roleRequest = await ctx.db.get(args.volunteerRoleRequestId);
+
+    if (!roleRequest) {
+      throw new Error("Request Not Found");
+    }
+    const user = await ctx.db.get(roleRequest.requesterId)
 
     if (!user) {
-      throw new Error("User not found");
+      throw new Error("User Not Found");
     }
 
     if (user.role !== "user") {
       throw new Error("Only normal users can become volunteers");
     }
 
-    await ctx.db.patch(args.userId, {
+
+    await ctx.db.patch(user._id, {
       role: "volunteer",
       campId: coordinator.campId,
       updatedAt: Date.now(),
     });
+    await ctx.db.patch(roleRequest._id,{
+      status : "approved",
+      reviewedBy: coordinator._id
+    })
 
     const existingVolunteer = await ctx.db
       .query("volunteers")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .unique();
 
     if (!existingVolunteer) {
       await ctx.db.insert("volunteers", {
-        userId: args.userId,
+        userId: user._id,
         campId: coordinator.campId,
         phone: user.phone,
         status: "available",
@@ -78,8 +88,8 @@ export const promoteToVolunteer = internalMutation({
         updatedAt: Date.now(),
       });
     }
-
-    return args.userId;
+    
+    return args.volunteerRoleRequestId;
   }
 })
 
