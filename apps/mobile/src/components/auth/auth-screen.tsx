@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export function AuthScreen({ children }: { children: ReactNode }) {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>
           Pukaar
@@ -13,7 +14,7 @@ export function AuthScreen({ children }: { children: ReactNode }) {
         </Text>
       </View>
       {children}
-    </View>
+    </SafeAreaView>
   );
 }
 
