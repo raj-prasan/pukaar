@@ -42,7 +42,7 @@ export default function TabsLayout() {
 
       <SwipeTabs.Screen
         name="second"
-        options={{ title: "Alerts" }}
+        options={{ title: "Incidents" }}
       />
 
       <SwipeTabs.Screen

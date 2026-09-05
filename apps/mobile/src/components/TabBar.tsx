@@ -57,8 +57,8 @@ const ICONS_BY_ROUTE = {
   },
 
   second: {
-    active: "notifications",
-    inactive: "notifications-outline",
+    active: "warning",
+    inactive: "warning-outline",
   },
 
   third: {
