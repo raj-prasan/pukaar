@@ -31,7 +31,7 @@ export default function OverviewPageView() {
   const pendingRequests = useQuery(
     api.public.assistanceRequest.getPendingRequests,
   );
-  const activeSOS = useQuery(api.public.sos.getActiveSOS);
+  const activeSOS = useQuery(api.public.sos.getActiveSOS, {});
   const pendingReports = useQuery(api.private.reports.getPendingReports);
   const volunteers = useQuery(api.private.users.volunteersUnderCoordinatorCamp);
 
@@ -102,7 +102,7 @@ export function OverviewView({
   reportCount: number | string;
   incidentCount: number | string;
   activeIncidents?: Incident[];
-  activeSOS?: AssistanceRequest[];
+  activeSOS?: any[];
   pendingRequests?: AssistanceRequest[];
   pendingReports?: Report[];
   volunteers?: User[];
@@ -219,24 +219,47 @@ export function OverviewView({
           href="/requests"
         >
           {activeSOS?.length ? (
-            activeSOS.slice(0, 2).map((request) => (
+            activeSOS.slice(0, 2).map((request: any) => (
               <div
                 key={request._id}
                 className="border-b border-border py-3 last:border-0"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <Badge variant="destructive">SOS</Badge>
-                  <span className="text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Badge variant="destructive">SOS</Badge>
+                    {request.sosEvent?.situation && (
+                      <Badge variant="outline" className="text-[10px] uppercase font-semibold">
+                        {request.sosEvent.situation}
+                      </Badge>
+                    )}
+                    {request.dispatch ? (
+                      <Badge variant="secondary" className="text-[10px]">
+                        Dispatched
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] text-destructive border-destructive/40">
+                        Needs Dispatch
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0">
                     {time(request.createdAt)}
                   </span>
                 </div>
                 <p className="mt-2 line-clamp-2 text-sm font-medium">
                   {request.description}
                 </p>
-                <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                  <MapPin className="size-3" />
-                  {request.address || "Location provided"}
-                </p>
+                <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1 truncate pr-2">
+                    <MapPin className="size-3 shrink-0" />
+                    <span className="truncate">{request.address || "Location provided"}</span>
+                  </span>
+                  {request.volunteer && (
+                    <span className="shrink-0 text-primary font-medium">
+                      {request.volunteer.name}
+                    </span>
+                  )}
+                </div>
               </div>
             ))
           ) : (

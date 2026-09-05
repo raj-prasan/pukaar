@@ -84,10 +84,12 @@ export const dispatchVolunteer = mutation({
 
     const now = Date.now();
 
+    const campId = request.assignedCampId ?? coordinator.campId;
+
     const dispatchId = await ctx.db.insert("dispatches", {
       requestId: request._id,
       volunteerId: volunteer._id,
-      campId: request.assignedCampId,
+      campId,
       status: "dispatched",
       instructions: args.instructions,
       dispatchedBy: coordinator._id,
@@ -132,13 +134,17 @@ export const dispatchVolunteer = mutation({
 
     await ctx.db.patch(request._id, {
       status: "assigned",
+      assignedCampId: campId,
       updatedAt: now,
     });
 
+    const isSos = request.requestType === "sos";
     await ctx.db.insert("requestUpdates", {
       requestId: request._id,
       status: "assigned",
-      note: `Volunteer ${volunteer.name} dispatched`,
+      note: isSos
+        ? `Emergency rescue team dispatched: ${volunteer.name}`
+        : `Volunteer ${volunteer.name} dispatched`,
       updatedBy: coordinator._id,
       createdAt: now,
     });
@@ -616,6 +622,51 @@ export const declineDispatch = mutation({
 });
 
 /**
+ * Coordinator cancels or recalls a volunteer dispatch.
+ */
+export const cancelDispatch = mutation({
+  args: {
+    dispatchId: v.id("dispatches"),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const coordinator = await requireCoordinator(ctx);
+    const dispatch = await ctx.db.get(args.dispatchId);
+    if (!dispatch) {
+      throw new Error("Dispatch not found");
+    }
+
+    if (dispatch.status === "completed") {
+      throw new Error("Cannot cancel a completed mission");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(dispatch._id, {
+      status: "cancelled",
+      updatedAt: now,
+    });
+
+    const request = await ctx.db.get(dispatch.requestId);
+    if (request) {
+      await ctx.db.patch(request._id, {
+        status: "under_review",
+        updatedAt: now,
+      });
+
+      await ctx.db.insert("requestUpdates", {
+        requestId: request._id,
+        status: "under_review",
+        note: `Dispatch cancelled by coordinator: ${args.reason ?? "Mission reassignment"}`,
+        updatedBy: coordinator._id,
+        createdAt: now,
+      });
+    }
+
+    return dispatch._id;
+  },
+});
+
+/**
  * Update volunteer availability status.
  */
 export const updateVolunteerStatus = mutation({
@@ -697,6 +748,14 @@ export const getMyActiveDispatch = query({
       incident = await ctx.db.get(request.incidentId);
     }
 
+    let sosEvent = null;
+    if (request?.requestType === "sos") {
+      sosEvent = await ctx.db
+        .query("sosEvents")
+        .withIndex("by_request", (q) => q.eq("requestId", request._id))
+        .first();
+    }
+
     const updates = request
       ? await ctx.db
           .query("requestUpdates")
@@ -715,6 +774,11 @@ export const getMyActiveDispatch = query({
           }
         : null,
       incident,
+      sosEvent: sosEvent
+        ? {
+            situation: sosEvent.situation,
+          }
+        : null,
       updates: updates.sort((a, b) => b.createdAt - a.createdAt),
     };
   },

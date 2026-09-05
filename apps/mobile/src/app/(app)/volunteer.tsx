@@ -483,13 +483,17 @@ export default function VolunteerScreen() {
                   <View style={styles.categoryBadge}>
                     <Ionicons
                       name={
-                        categoryIcons[activeDispatch.request?.category ?? "other"] ?? "alert-circle"
+                        activeDispatch.request?.requestType === "sos"
+                          ? "alert-circle"
+                          : categoryIcons[activeDispatch.request?.category ?? "other"] ?? "alert-circle"
                       }
                       size={16}
                       color={theme.colors.card}
                     />
                     <Text style={styles.categoryBadgeText}>
-                      {(activeDispatch.request?.category ?? "assistance").toUpperCase()}
+                      {activeDispatch.request?.requestType === "sos"
+                        ? "EMERGENCY SOS"
+                        : (activeDispatch.request?.category ?? "assistance").toUpperCase()}
                     </Text>
                   </View>
 
@@ -518,7 +522,14 @@ export default function VolunteerScreen() {
                   </View>
                 </View>
 
-                {activeDispatch.status === "dispatched" ? (
+                {activeDispatch.request?.requestType === "sos" ? (
+                  <View style={[styles.assignedAlertBanner, { backgroundColor: "rgba(239, 68, 68, 0.12)", borderColor: "#ef4444" }]}>
+                    <View style={[styles.assignedAlertDot, { backgroundColor: "#ef4444" }]} />
+                    <Text style={[styles.assignedAlertText, { color: "#ef4444" }]}>
+                      🚨 EMERGENCY SOS DISTRESS · RAPID RESPONSE REQUIRED
+                    </Text>
+                  </View>
+                ) : activeDispatch.status === "dispatched" ? (
                   <View style={styles.assignedAlertBanner}>
                     <View style={styles.assignedAlertDot} />
                     <Text style={styles.assignedAlertText}>
@@ -528,8 +539,10 @@ export default function VolunteerScreen() {
                 ) : null}
 
                 <Text style={styles.missionTitle}>
-                  {activeDispatch.incident?.title ??
-                    `${(activeDispatch.request?.category ?? "Assistance").toUpperCase()} ASSIGNMENT`}
+                  {activeDispatch.request?.requestType === "sos"
+                    ? `🚨 EMERGENCY SOS RESCUE${activeDispatch.sosEvent?.situation ? `: ${activeDispatch.sosEvent.situation.toUpperCase()}` : ""}`
+                    : activeDispatch.incident?.title ??
+                      `${(activeDispatch.request?.category ?? "Assistance").toUpperCase()} ASSIGNMENT`}
                 </Text>
 
                 <Text style={styles.missionDescription}>
