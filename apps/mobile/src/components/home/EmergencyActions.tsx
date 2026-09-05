@@ -1,12 +1,29 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { theme } from "@/constants/theme";
 
 export default function EmergencyActions() {
+  const router = useRouter();
+
   return (
     <View style={styles.row}>
-      <Pressable accessibilityRole="button" style={styles.sosButton}>
+      <Pressable
+        accessibilityLabel="Report an incident"
+        accessibilityRole="button"
+        onPress={() => router.push("/report")}
+        style={styles.reportButton}
+      >
+        <Ionicons name="document-text-outline" size={22} color={theme.colors.accentForeground} />
+        <Text style={styles.reportTitle}>Report incident</Text>
+      </Pressable>
+      <Pressable
+        accessibilityLabel="Send SOS"
+        accessibilityRole="button"
+        onPress={() => router.push("/(app)/sos")}
+        style={styles.sosButton}
+      >
         <View style={styles.iconCircle}>
           <Ionicons name="warning" size={20} color={theme.colors.destructiveForeground} />
         </View>
@@ -15,26 +32,17 @@ export default function EmergencyActions() {
           <Text style={styles.subtitle}>Immediate danger - get help now</Text>
         </View>
       </Pressable>
-      <Pressable
-        accessibilityLabel="Report an incident"
-        accessibilityRole="button"
-        style={styles.reportButton}
-      >
-        <Ionicons name="add" size={26} color="#eaeff2" />
-      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: {
-    flexDirection: "row",
-    gap: 10,
+    gap: 8,
     paddingHorizontal: 20,
     marginBottom: 18,
   },
   sosButton: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -63,12 +71,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   reportButton: {
-    width: 56,
+    minHeight: 64,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
     borderWidth: theme.borderWidth,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.card,
-    backgroundColor: theme.colors.card,
+    backgroundColor: theme.colors.accent,
+  },
+  reportTitle: {
+    color: theme.colors.accentForeground,
+    fontSize: 15,
+    fontWeight: "700",
   },
 });
