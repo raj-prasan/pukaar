@@ -11,6 +11,7 @@ import {
   HomeIcon,
   BellIcon,
   ShieldIcon,
+  SpeakerIcon,
 } from "lucide-react"
 
 import {
@@ -45,6 +46,11 @@ const overviewItems = [
 ]
 
 const operationsItems = [
+  {
+    title: "Reports",
+    icon: SpeakerIcon,
+    url: "/reports",
+  },
   {
     title: "Incidents",
     icon: AlertTriangleIcon,
@@ -127,9 +133,9 @@ export const DashboardSidebar = () => {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                     className={cn(
-                      "transition-colors",
+                      "transition-colors hover:rounded-none hover:bg-muted-foreground/40",
                       isActive(item.url) &&
-                        "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        "bg-sidebar-accent! rounded-none! text-sidebar-accent-foreground! font-medium"
                     )}
                   >
                     <item.icon className="size-4 shrink-0" />
@@ -156,9 +162,9 @@ export const DashboardSidebar = () => {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                     className={cn(
-                      "transition-colors",
+                      "transition-colors hover:rounded-none hover:bg-muted-foreground/40",
                       isActive(item.url) &&
-                        "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        "bg-sidebar-accent! rounded-none! text-sidebar-accent-foreground! font-medium"
                     )}
                   >
                     <item.icon className="size-4 shrink-0" />
@@ -185,9 +191,9 @@ export const DashboardSidebar = () => {
                     isActive={isActive(item.url)}
                     tooltip={item.title}
                     className={cn(
-                      "transition-colors",
+                      "transition-colors hover:rounded-none hover:bg-muted-foreground/40",
                       isActive(item.url) &&
-                        "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        "bg-sidebar-accent! rounded-none! text-sidebar-accent-foreground! font-medium"
                     )}
                   >
                     <item.icon className="size-4 shrink-0" />
