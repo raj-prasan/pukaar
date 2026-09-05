@@ -70,13 +70,13 @@ export default defineSchema({
 
     reviewedBy: v.optional(v.id("users")),
     note: v.optional(v.string()),
-
+    campId: v.id("camps"),
     createdAt: v.number(),
     updatedAt: v.number(),
     reviewedAt: v.optional(v.number()),
   })
     .index("by_requester", ["requesterId"])
-    .index("by_status", ["status"])
+    .index("by_status_and_camp", ["status", "campId"])
     .index("by_requester_and_status", ["requesterId", "status"]),
 
   camps: defineTable({
@@ -96,7 +96,8 @@ export default defineSchema({
 
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_status", ["status"]),
+    uniqueCode: v.optional(v.number())
+  }).index("by_status", ["status"]).index("by_code", ["uniqueCode"]),
 
   reports: defineTable({
     reporterId: v.id("users"),
@@ -128,6 +129,7 @@ export default defineSchema({
 
     latitude: v.number(),
     longitude: v.number(),
+    locationAccuracy: v.optional(v.number()),
 
     address: v.optional(v.string()),
 

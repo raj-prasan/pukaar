@@ -77,8 +77,10 @@ export const ensureCurrentUserProfile = mutation({
 });
 
 export const requestVolunteerRole = mutation({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    code: v.number()
+  },
+  handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
 
     if (user.role === "volunteer") {
@@ -96,6 +98,11 @@ export const requestVolunteerRole = mutation({
       throw new Error("A volunteer role request is already pending.");
     }
 
+    const camp = await ctx.db.query("camps").withIndex("by_code", (q)=> q.eq("uniqueCode", args.code)).unique();
+    if(!camp){
+      throw new Error("Camp Not Found.")
+    }
+
     const now = Date.now();
 
     return await ctx.db.insert("volunteerRoleRequests", {
@@ -103,6 +110,7 @@ export const requestVolunteerRole = mutation({
       status: "pending",
       createdAt: now,
       updatedAt: now,
+      campId: camp?._id
     });
   },
 });

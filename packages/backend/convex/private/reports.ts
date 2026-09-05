@@ -52,3 +52,22 @@ export const getPendingReports = query({
       .collect();
   },
 });
+
+export const getReportsByIncident = query({
+  args: {
+    incidentId: v.id("incidents"),
+  },
+
+  handler: async (ctx, args) => {
+    const coordinator = await requireCoordinator(ctx);
+    if (!coordinator) {
+      throw new Error("UNAUTHORIZED");
+    }
+
+    return await ctx.db
+      .query("reports")
+      .withIndex("by_incident", (q) => q.eq("incidentId", args.incidentId))
+      .order("desc")
+      .collect();
+  },
+});

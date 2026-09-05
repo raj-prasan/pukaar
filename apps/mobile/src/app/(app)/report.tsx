@@ -82,6 +82,7 @@ export default function ReportScreen() {
   const [description, setDescription] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [photo, setPhoto] = useState<CameraCapturedPicture | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
@@ -107,6 +108,7 @@ export default function ReportScreen() {
 
       setLatitude(currentLocation.coords.latitude);
       setLongitude(currentLocation.coords.longitude);
+      setLocationAccuracy(currentLocation.coords.accuracy ?? null);
     } catch {
       Alert.alert("Unable to get location", "Try again or enter the location manually.");
     } finally {
@@ -180,6 +182,7 @@ export default function ReportScreen() {
         ...(severity ? { severity } : {}),
         latitude,
         longitude,
+        ...(locationAccuracy ? { locationAccuracy } : {}),
         address: address.trim(),
         imageStorageId: storageId,
       });

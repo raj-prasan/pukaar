@@ -2,11 +2,11 @@
 
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import React, { useMemo } from "react";
+import React from "react";
 import { Circle, CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
 import type { Doc } from "../../../../packages/backend/convex/_generated/dataModel";
 
-const INDIA_CENTER: [number, number] = [20.5937, 78.9629];
+const INDIA_CENTER: [number, number] = [26.699928, 92.834822];
 
 type EnrichedCamp = Doc<"camps"> & {
   isMyCamp?: boolean;
@@ -62,20 +62,9 @@ function Marker({
 }
 
 export function CoordinatorMap({ data }: { data?: MapData }) {
-  const center = useMemo<[number, number]>(() => {
-    const myCamp = data?.camps?.find(
-      (c) => c.isMyCamp || c._id === data?.userCampId || c.createdBy === data?.currentUserId
-    );
-    const firstCamp = data?.camps?.[0];
-    const firstIncident = data?.incidents[0];
-    const firstReport = data?.reports[0];
-    const location = myCamp ?? firstCamp ?? firstIncident ?? firstReport;
-    return location ? [location.latitude, location.longitude] : INDIA_CENTER;
-  }, [data]);
-
   return (
     <MapContainer
-      center={center}
+      center={INDIA_CENTER}
       zoom={data?.camps?.length || data?.incidents.length || data?.reports.length ? 6 : 5}
       scrollWheelZoom
       className="h-full min-h-[560px] w-full"
@@ -97,7 +86,7 @@ export function CoordinatorMap({ data }: { data?: MapData }) {
             {/* 100 km Radius Circle (100,000 meters) */}
             <Circle
               center={[camp.latitude, camp.longitude]}
-              radius={100000}
+              radius={30000}
               pathOptions={{
                 color,
                 fillColor: color,
