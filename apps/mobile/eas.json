@@ -10,13 +10,24 @@
       "environment": "development"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_ZXZpZGVudC1wb3NzdW0tNzkxMi5jbGVyay5hY2NvdW50cy5kZXYk",
+        "EXPO_PUBLIC_CONVEX_URL": "https://shiny-goldfinch-923.convex.cloud"
+      }
     },
     "production": {
       "autoIncrement": true,
       "environment": "production",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_ZXZpZGVudC1wb3NzdW0tNzkxMi5jbGVyay5hY2NvdW50cy5kZXYk",
+        "EXPO_PUBLIC_CONVEX_URL": "https://shiny-goldfinch-923.convex.cloud"
       }
     }
   },
