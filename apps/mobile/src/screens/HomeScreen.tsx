@@ -21,8 +21,8 @@ export default function HomeScreen() {
       >
         <HomeHeader firstName={firstName} />
         <HomeStats />
-        <ScenarioGuides />
         <EmergencyActions />
+        <ScenarioGuides />
         <NearbyResources />
         <View style={styles.bottomSpace} />
       </ScrollView>
