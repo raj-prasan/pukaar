@@ -20,10 +20,10 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <HomeHeader firstName={firstName} />
-        <HomeStats />
         <EmergencyActions />
-        <ScenarioGuides />
+        <HomeStats />
         <NearbyResources />
+        <ScenarioGuides />
         <View style={styles.bottomSpace} />
       </ScrollView>
     </SafeAreaView>

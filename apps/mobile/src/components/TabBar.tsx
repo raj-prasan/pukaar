@@ -332,6 +332,12 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     borderWidth: theme.borderWidth,
 
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 8,
+
     overflow: "hidden",
   },
 
