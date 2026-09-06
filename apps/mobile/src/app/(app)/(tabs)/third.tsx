@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@clerk/expo";
-import { useConvexAuth, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
@@ -93,7 +93,6 @@ function formatDate(timestamp: number) {
 export default function ThirdScreen() {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useAuth();
-  const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
   const [selectedTab, setSelectedTab] = useState<"sos" | "reports">("sos");
   const [reportFilter, setReportFilter] = useState<"all" | "pending" | "verified">("all");
   const [refreshing, setRefreshing] = useState(false);
@@ -105,7 +104,7 @@ export default function ThirdScreen() {
 
   const myReports = useQuery(
     api.public.reports.getMyReports,
-    isLoaded && isSignedIn && isConvexAuthenticated ? EMPTY_ARGS : "skip"
+    isLoaded && isSignedIn ? EMPTY_ARGS : "skip"
   );
 
   // Persistent reference cache to eliminate flickering during background Convex syncs
@@ -122,17 +121,12 @@ export default function ThirdScreen() {
   }
 
   if (myReports !== undefined && myReports !== null) {
-    if (refreshing || myReports.length > 0 || !lastReportsData.current?.length) {
-      lastReportsData.current = myReports;
-      cachedGlobalMyReports = myReports;
-    }
+    lastReportsData.current = myReports;
+    cachedGlobalMyReports = myReports;
   }
 
   const live = activeRequestData ?? lastRequestData.current ?? cachedGlobalActiveRequest;
-  const reportsList =
-    myReports && (myReports.length > 0 || !lastReportsData.current?.length)
-      ? myReports
-      : lastReportsData.current ?? cachedGlobalMyReports ?? myReports ?? [];
+  const reportsList = myReports ?? lastReportsData.current ?? cachedGlobalMyReports ?? [];
 
   const isSosInitialLoading =
     !isLoaded || (isSignedIn && activeRequestData === undefined && !cachedGlobalActiveRequest);

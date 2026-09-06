@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@clerk/expo";
 import { CameraView, useCameraPermissions, type CameraCapturedPicture } from "expo-camera";
 import * as FileSystem from "expo-file-system/legacy";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -89,7 +89,8 @@ let cachedGlobalSimilarCheck: Record<string, any> = {};
 
 export default function ReportScreen() {
   const router = useRouter();
-  const { isLoaded } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
+  const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
   const cameraRef = useRef<CameraView>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [category, setCategory] = useState<IncidentCategory | null>(null);
@@ -117,43 +118,111 @@ export default function ReportScreen() {
     };
   }, [latitude, longitude]);
 
+  const cacheKey =
+    category && stableCoords ? `${category}_${stableCoords.lat}_${stableCoords.lon}` : "";
+
+  // Skip query while submitting, after submit, or until Convex auth is ready
   const similarCheckQueryArgs = useMemo(() => {
-    if (!isLoaded || !category || !stableCoords) return "skip" as const;
+    if (isSubmitting || payload) return "skip" as const;
+    if (!isLoaded || !isSignedIn || !isConvexAuthenticated || !category || !stableCoords) {
+      return "skip" as const;
+    }
     return {
       category,
       latitude: stableCoords.lat,
       longitude: stableCoords.lon,
     };
-  }, [isLoaded, category, stableCoords]);
+  }, [isSubmitting, payload, isLoaded, isSignedIn, isConvexAuthenticated, category, stableCoords]);
 
   const similarCheck = useQuery(
     api.public.reports.checkSimilarReportsAndIncidents,
     similarCheckQueryArgs
   );
 
-  const cacheKey =
-    category && stableCoords ? `${category}_${stableCoords.lat}_${stableCoords.lon}` : "";
-  const lastSimilarCheck = useRef<any>(cacheKey ? cachedGlobalSimilarCheck[cacheKey] : null);
+  const lastSimilarCheck = useRef<any>(null);
 
-  if (similarCheck !== undefined && similarCheck !== null) {
-    lastSimilarCheck.current = similarCheck;
-    if (cacheKey) {
-      cachedGlobalSimilarCheck[cacheKey] = similarCheck;
+  // Synchronize lastSimilarCheck with cacheKey change
+  useEffect(() => {
+    lastSimilarCheck.current = cacheKey ? cachedGlobalSimilarCheck[cacheKey] ?? null : null;
+  }, [cacheKey]);
+
+  // Update cached state when not submitting and not submitted
+  useEffect(() => {
+    if (isSubmitting || payload || !similarCheck || !cacheKey) {
+      return;
     }
-  }
 
-  const activeSimilar =
-    similarCheck ??
-    (cacheKey && cachedGlobalSimilarCheck[cacheKey]
-      ? cachedGlobalSimilarCheck[cacheKey]
-      : lastSimilarCheck.current);
+    const prev = cachedGlobalSimilarCheck[cacheKey];
+    // Safeguard: Once duplicate or incident is found for this key, never let transient queries flip them to false
+    const merged = prev
+      ? {
+          ...similarCheck,
+          hasSimilarIncident: Boolean(similarCheck.hasSimilarIncident || prev.hasSimilarIncident),
+          hasUserDuplicate: Boolean(similarCheck.hasUserDuplicate || prev.hasUserDuplicate),
+          hasSimilarReport: Boolean(similarCheck.hasSimilarReport || prev.hasSimilarReport),
+          similarIncidents:
+            similarCheck.similarIncidents && similarCheck.similarIncidents.length > 0
+              ? similarCheck.similarIncidents
+              : prev.similarIncidents ?? [],
+          userReports:
+            similarCheck.userReports && similarCheck.userReports.length > 0
+              ? similarCheck.userReports
+              : prev.userReports ?? [],
+          similarReports:
+            similarCheck.similarReports && similarCheck.similarReports.length > 0
+              ? similarCheck.similarReports
+              : prev.similarReports ?? [],
+        }
+      : similarCheck;
+
+    cachedGlobalSimilarCheck[cacheKey] = merged;
+    lastSimilarCheck.current = merged;
+  }, [isSubmitting, payload, similarCheck, cacheKey]);
+
+  const cachedData = cacheKey ? cachedGlobalSimilarCheck[cacheKey] : null;
+
+  // Active similar data: completely freeze while submitting or if payload exists
+  const activeSimilar = useMemo(() => {
+    if (payload) return null;
+    if (isSubmitting) {
+      return cachedData ?? lastSimilarCheck.current;
+    }
+
+    const current = similarCheck ?? cachedData ?? lastSimilarCheck.current;
+    if (!current) return null;
+
+    if (cachedData) {
+      return {
+        ...current,
+        hasSimilarIncident: Boolean(current.hasSimilarIncident || cachedData.hasSimilarIncident),
+        hasUserDuplicate: Boolean(current.hasUserDuplicate || cachedData.hasUserDuplicate),
+        hasSimilarReport: Boolean(current.hasSimilarReport || cachedData.hasSimilarReport),
+        similarIncidents:
+          current.similarIncidents && current.similarIncidents.length > 0
+            ? current.similarIncidents
+            : cachedData.similarIncidents ?? [],
+        userReports:
+          current.userReports && current.userReports.length > 0
+            ? current.userReports
+            : cachedData.userReports ?? [],
+        similarReports:
+          current.similarReports && current.similarReports.length > 0
+            ? current.similarReports
+            : cachedData.similarReports ?? [],
+      };
+    }
+
+    return current;
+  }, [payload, isSubmitting, similarCheck, cachedData]);
 
   const hasUserDuplicate = Boolean(activeSimilar?.hasUserDuplicate);
   const hasSimilarIncident = Boolean(activeSimilar?.hasSimilarIncident);
   const hasSimilarReport = Boolean(activeSimilar?.hasSimilarReport);
   const hasBoth = hasUserDuplicate && hasSimilarIncident;
   const showWarning = Boolean(
-    activeSimilar && (hasUserDuplicate || hasSimilarIncident || hasSimilarReport)
+    !payload &&
+    activeSimilar &&
+    (hasUserDuplicate || hasSimilarIncident || hasSimilarReport)
   );
 
   useEffect(() => {
@@ -225,6 +294,7 @@ export default function ReportScreen() {
   }
 
   async function executeSubmit(attachedIncidentId?: Id<"incidents">) {
+    if (isSubmitting) return;
     if (!category || !address.trim() || latitude === null || longitude === null || !photo) {
       Alert.alert(
         "Complete the report",
@@ -327,6 +397,7 @@ export default function ReportScreen() {
   }
 
   function handleSubmit() {
+    if (isSubmitting) return;
     if (!category || !address.trim() || latitude === null || longitude === null || !photo) {
       Alert.alert(
         "Complete the report",
