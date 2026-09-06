@@ -6,47 +6,55 @@ import { theme } from "@/constants/theme";
 
 const guides = [
   {
-    title: "Flood",
-    subtitle: "Rising water, blocked roads",
+    title: "Flood Alert",
+    subtitle: "Rising water & flash floods",
     icon: "water" as const,
-    color: theme.colors.primary,
+    color: "#0284c7",
+    bg: "rgba(2, 132, 199, 0.1)",
     steps: [
-      "Move to higher ground immediately, do not wait for water to rise further.",
-      "Avoid walking or driving through moving water, even shallow.",
-      "Report your location if you are trapped.",
+      "Move to higher ground immediately; do not wait for water to rise further.",
+      "Avoid walking or driving through moving water, even if it looks shallow.",
+      "Turn off main electricity breakers if you can safely reach them without wading.",
+      "Report your location via Pukaar SOS if you are stranded or trapped.",
     ],
   },
   {
-    title: "Earth Quake",
-    subtitle: "During and after shaking",
-    icon: "warning" as const,
-    color: theme.colors.accent,
+    title: "Earthquake",
+    subtitle: "Drop, cover & hold on",
+    icon: "pulse" as const,
+    color: "#d97706",
+    bg: "rgba(217, 119, 6, 0.1)",
     steps: [
-      "Drop, cover under sturdy furniture, and hold on until shaking stops.",
-      "Stay away from windows, mirrors, and tall furniture.",
-      "Check for injuries before moving outside.",
+      "Drop to hands and knees, cover under sturdy furniture, and hold on until shaking stops.",
+      "Stay away from glass windows, exterior walls, and heavy overhead lighting.",
+      "Do not use elevators; use stairwells only once shaking ceases completely.",
+      "Check yourself and nearby survivors for injuries before moving outside.",
     ],
   },
   {
-    title: "Fire",
-    subtitle: "Smoke, structural fire",
+    title: "Fire Hazard",
+    subtitle: "Smoke escape & containment",
     icon: "flame" as const,
-    color: theme.colors.destructive,
+    color: "#e11d48",
+    bg: "rgba(225, 29, 72, 0.1)",
     steps: [
-      "Stay low to the ground to avoid smoke inhalation.",
-      "Check doors for heat before opening.",
-      "Once out, stay out - do not re-enter for belongings.",
+      "Stay low to the floor beneath smoke where air is clearer and cooler.",
+      "Feel door surfaces and handles with the back of your hand before opening.",
+      "Once you are out, stay out — never re-enter a burning structure for belongings.",
+      "Call emergency helpline 112 and signal from a window if escape routes are blocked.",
     ],
   },
   {
-    title: "Severe storm",
-    subtitle: "High wind, heavy rain",
+    title: "Severe Storm",
+    subtitle: "High winds & lightning",
     icon: "thunderstorm" as const,
-    color: theme.colors.secondary,
+    color: "#7c3aed",
+    bg: "rgba(124, 58, 237, 0.1)",
     steps: [
-      "Stay indoors and away from windows until it passes.",
-      "Avoid sheltering under trees or loose structures outside.",
-      "Unplug electronics if lightning is frequent nearby.",
+      "Stay indoors away from windows, skylights, and glass exterior doors.",
+      "Avoid sheltering under isolated tall trees or temporary tin/metal sheds.",
+      "Unplug high-voltage electronics if lightning is frequent in your vicinity.",
+      "Keep power banks and phones ready for emergency broadcasts.",
     ],
   },
 ];
@@ -57,34 +65,39 @@ export default function ScenarioGuides() {
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>If this happens</Text>
-      <View style={styles.list}>
-        {guides.map((guide, index) => {
-          return (
-            <Pressable
-              key={guide.title}
-              accessibilityRole="button"
-              onPress={() => setSelectedGuide(index)}
-              style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-            >
-              <View style={styles.header}>
-                <View style={[styles.iconBox, { backgroundColor: `${guide.color}24` }]}>
-                  <Ionicons name={guide.icon} size={19} color={guide.color} />
-                </View>
-                <View style={styles.heading}>
-                  <Text style={styles.title}>{guide.title}</Text>
-                  <Text style={styles.subtitle}>{guide.subtitle}</Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color="#8b99a3"
-                />
-              </View>
-            </Pressable>
-          );
-        })}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionEyebrow}>SAFETY PROTOCOLS</Text>
+        <Text style={styles.sectionTitle}>Disaster Survival Guides</Text>
+        <Text style={styles.sectionSubtitle}>
+          Tap any hazard for quick, field-verified survival steps.
+        </Text>
       </View>
+
+      <View style={styles.grid}>
+        {guides.map((guide, index) => (
+          <Pressable
+            key={guide.title}
+            accessibilityRole="button"
+            onPress={() => setSelectedGuide(index)}
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+          >
+            <View style={[styles.iconBox, { backgroundColor: guide.bg }]}>
+              <Ionicons name={guide.icon} size={20} color={guide.color} />
+            </View>
+            <Text style={styles.cardTitle}>{guide.title}</Text>
+            <Text style={styles.cardSubtitle} numberOfLines={1}>
+              {guide.subtitle}
+            </Text>
+            <View style={styles.cardBottomRow}>
+              <Text style={[styles.stepsCount, { color: guide.color }]}>
+                {guide.steps.length} Steps
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color={guide.color} />
+            </View>
+          </Pressable>
+        ))}
+      </View>
+
       <Modal
         transparent
         visible={activeGuide !== null}
@@ -95,31 +108,44 @@ export default function ScenarioGuides() {
           {activeGuide ? (
             <Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
               <View style={styles.modalHeader}>
-                <View style={[styles.iconBox, { backgroundColor: `${activeGuide.color}24` }]}>
+                <View style={[styles.modalIconBox, { backgroundColor: activeGuide.bg }]}>
                   <Ionicons name={activeGuide.icon} size={22} color={activeGuide.color} />
                 </View>
-                <View style={styles.heading}>
+                <View style={styles.modalHeading}>
                   <Text style={styles.modalTitle}>{activeGuide.title}</Text>
-                  <Text style={styles.subtitle}>{activeGuide.subtitle}</Text>
+                  <Text style={styles.modalSubtitle}>{activeGuide.subtitle}</Text>
                 </View>
                 <Pressable
                   accessibilityLabel="Close guide"
                   accessibilityRole="button"
-                  hitSlop={10}
+                  hitSlop={12}
                   onPress={() => setSelectedGuide(null)}
                   style={styles.closeButton}
                 >
-                  <Ionicons name="close" size={22} color={theme.colors.foreground} />
+                  <Ionicons name="close" size={20} color={theme.colors.mutedForeground} />
                 </Pressable>
               </View>
-              <View style={styles.steps}>
-                {activeGuide.steps.map((step) => (
-                  <View key={step} style={styles.step}>
-                    <View style={[styles.bullet, { backgroundColor: activeGuide.color }]} />
+
+              <View style={styles.stepsList}>
+                {activeGuide.steps.map((step, idx) => (
+                  <View key={step} style={styles.stepRow}>
+                    <View style={[styles.stepNumberBadge, { backgroundColor: activeGuide.bg }]}>
+                      <Text style={[styles.stepNumberText, { color: activeGuide.color }]}>
+                        {idx + 1}
+                      </Text>
+                    </View>
                     <Text style={styles.stepText}>{step}</Text>
                   </View>
                 ))}
               </View>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setSelectedGuide(null)}
+                style={[styles.dismissButton, { backgroundColor: activeGuide.color }]}
+              >
+                <Text style={styles.dismissButtonText}>Understood</Text>
+              </Pressable>
             </Pressable>
           ) : null}
         </Pressable>
@@ -130,112 +156,170 @@ export default function ScenarioGuides() {
 
 const styles = StyleSheet.create({
   section: {
-    marginBottom: 22,
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  sectionEyebrow: {
+    color: theme.colors.mutedForeground,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.6,
   },
   sectionTitle: {
-    paddingHorizontal: 20,
-    marginBottom: 10,
     color: theme.colors.foreground,
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+    marginTop: 2,
   },
-  list: {
+  sectionSubtitle: {
+    color: theme.colors.mutedForeground,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 12,
     paddingHorizontal: 20,
   },
   card: {
-    width: "48%",
-    overflow: "hidden",
-    borderWidth: theme.borderWidth,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.card,
     backgroundColor: theme.colors.card,
+    borderColor: theme.colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    elevation: 2,
+    padding: 15,
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    width: "48%",
   },
   cardPressed: {
-    opacity: 0.78,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 13,
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
   },
   iconBox: {
-    width: 36,
-    height: 36,
     alignItems: "center",
+    borderRadius: 12,
+    height: 38,
     justifyContent: "center",
-    borderRadius: 10,
+    marginBottom: 10,
+    width: 38,
   },
-  heading: {
-    flex: 1,
-  },
-  title: {
+  cardTitle: {
     color: theme.colors.foreground,
-    fontSize: 13.5,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "800",
   },
-  subtitle: {
-    marginTop: 1,
+  cardSubtitle: {
     color: theme.colors.mutedForeground,
     fontSize: 11,
+    lineHeight: 15,
+    marginTop: 2,
+  },
+  cardBottomRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 2,
+    marginTop: 10,
+  },
+  stepsCount: {
+    fontSize: 11,
+    fontWeight: "800",
   },
   modalBackdrop: {
-    flex: 1,
     alignItems: "center",
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+    flex: 1,
     justifyContent: "center",
     padding: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.45)",
   },
   modalCard: {
-    width: "100%",
-    maxWidth: 420,
-    borderWidth: theme.borderWidth,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.card,
-    padding: 18,
     backgroundColor: theme.colors.card,
+    borderRadius: 24,
+    maxWidth: 440,
+    padding: 22,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    width: "100%",
   },
   modalHeader: {
-    flexDirection: "row",
     alignItems: "center",
+    flexDirection: "row",
     gap: 12,
     marginBottom: 18,
+  },
+  modalIconBox: {
+    alignItems: "center",
+    borderRadius: 14,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  modalHeading: {
+    flex: 1,
   },
   modalTitle: {
     color: theme.colors.foreground,
     fontSize: 18,
     fontWeight: "800",
   },
+  modalSubtitle: {
+    color: theme.colors.mutedForeground,
+    fontSize: 12,
+    marginTop: 1,
+  },
   closeButton: {
     alignItems: "center",
+    backgroundColor: theme.colors.muted,
+    borderRadius: 16,
+    height: 32,
     justifyContent: "center",
-    width: 30,
-    height: 30,
+    width: 32,
   },
-  steps: {
-    gap: 8,
-    paddingRight: 16,
-    paddingBottom: 16,
-    paddingLeft: 61,
+  stepsList: {
+    gap: 12,
+    marginBottom: 20,
   },
-  step: {
+  stepRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: 12,
   },
-  bullet: {
-    width: 5,
-    height: 5,
-    marginTop: 6,
-    borderRadius: 3,
-    backgroundColor: theme.colors.mutedForeground,
+  stepNumberBadge: {
+    alignItems: "center",
+    borderRadius: 8,
+    height: 24,
+    justifyContent: "center",
+    marginTop: 1,
+    width: 24,
+  },
+  stepNumberText: {
+    fontSize: 12,
+    fontWeight: "800",
   },
   stepText: {
-    flex: 1,
     color: theme.colors.foreground,
-    fontSize: 12,
-    lineHeight: 18,
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  dismissButton: {
+    alignItems: "center",
+    borderRadius: 14,
+    justifyContent: "center",
+    paddingVertical: 13,
+  },
+  dismissButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "800",
   },
 });
+
