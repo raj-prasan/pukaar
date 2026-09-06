@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@clerk/expo";
 import { useMutation, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -18,6 +18,9 @@ import {
 import { theme } from "@/constants/theme";
 import { api } from "@backend/convex/_generated/api";
 
+const EMPTY_ARGS = {};
+let cachedGlobalIsVolunteer = false;
+
 export default function EmergencyActions() {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useAuth();
@@ -27,9 +30,27 @@ export default function EmergencyActions() {
   const [lockedStatus, setLockedStatus] = useState<"pending" | "approved" | null>(null);
   const [campName, setCampName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const profile = useQuery(
+    api.public.users.getCurrentUserProfile,
+    isLoaded && isSignedIn ? EMPTY_ARGS : "skip",
+  );
+  const lastProfile = useRef<NonNullable<typeof profile> | null>(null);
+  if (profile !== undefined && profile !== null) {
+    lastProfile.current = profile;
+    if (profile.role === "volunteer" || profile.role === "admin") {
+      cachedGlobalIsVolunteer = true;
+    }
+  }
+  const displayedProfile = profile ?? lastProfile.current;
+  const isVolunteer =
+    displayedProfile?.role === "volunteer" ||
+    displayedProfile?.role === "admin" ||
+    cachedGlobalIsVolunteer;
+
   const request = useQuery(
     api.public.users.getCurrentVolunteerRoleRequest,
-    isLoaded && isSignedIn && isVolunteerModalVisible ? {} : "skip",
+    isLoaded && isSignedIn && isVolunteerModalVisible ? EMPTY_ARGS : "skip",
   );
   const requestVolunteerRole = useMutation(api.public.users.requestVolunteerRole);
 
@@ -79,41 +100,100 @@ export default function EmergencyActions() {
   const isRequestLoading = request === undefined && lockedStatus === null;
 
   return (
-    <>
-      <View style={styles.row}>
-        <Pressable
-          accessibilityLabel="Report an incident"
-          accessibilityRole="button"
-          onPress={() => router.push("/report")}
-          style={[styles.actionButton, styles.reportButton]}
-        >
-          <Ionicons name="document-text-outline" size={21} color={theme.colors.accentForeground} />
-          <Text style={styles.reportTitle}>Report incident</Text>
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Become a volunteer"
-          accessibilityRole="button"
-          onPress={() => setVolunteerModalVisible(true)}
-          style={[styles.actionButton, styles.volunteerButton]}
-        >
-          <Ionicons name="people-outline" size={21} color={theme.colors.primaryForeground} />
-          <Text style={styles.volunteerTitle}>Become a volunteer</Text>
-        </Pressable>
-      </View>
+    <View style={styles.container}>
+      {/* 1. Hero Emergency SOS Banner */}
       <Pressable
         accessibilityLabel="Send SOS"
         accessibilityRole="button"
         onPress={() => router.push("/(app)/sos")}
-        style={styles.sosButton}
+        style={({ pressed }) => [styles.sosButton, pressed && styles.sosButtonPressed]}
       >
-        <View style={styles.iconCircle}>
-          <Ionicons name="warning" size={20} color={theme.colors.destructiveForeground} />
-        </View>
-        <View>
-          <Text style={styles.title}>Send SOS</Text>
-          <Text style={styles.subtitle}>Immediate danger - get help now</Text>
+        <View style={styles.sosContentRow}>
+          <View style={styles.sosIconCircle}>
+            <Ionicons name="radio" size={24} color={theme.colors.destructiveForeground} />
+          </View>
+          <View style={styles.sosTextCol}>
+            <View style={styles.sosBadgeRow}>
+              <View style={styles.sosLiveDot} />
+              <Text style={styles.sosEyebrow}>CRITICAL DISTRESS BEACON</Text>
+            </View>
+            <Text style={styles.sosTitle}>Send Emergency SOS</Text>
+            <Text style={styles.sosSubtitle}>Broadcast GPS & survivor details to nearest base</Text>
+          </View>
+          <View style={styles.sosArrowWrap}>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.destructiveForeground} />
+          </View>
         </View>
       </Pressable>
+
+      {/* 2. Secondary Action Cards Grid */}
+      <View style={styles.actionGrid}>
+        {/* Card A: Report Hazard */}
+        <Pressable
+          accessibilityLabel="Report an incident"
+          accessibilityRole="button"
+          onPress={() => router.push("/report")}
+          style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}
+        >
+          <View style={[styles.cardIconWrap, styles.reportIconWrap]}>
+            <Ionicons name="camera" size={20} color="#ea580c" />
+          </View>
+          <Text style={styles.actionCardTitle}>Report Hazard</Text>
+          <Text style={styles.actionCardSub}>Upload photo & GPS coordinates</Text>
+          <View style={styles.reportTag}>
+            <Text style={styles.reportTagText}>COMMUNITY RADAR</Text>
+          </View>
+        </Pressable>
+
+        {/* Card B: Volunteer Desk */}
+        <Pressable
+          accessibilityLabel={isVolunteer ? "Open Volunteer Desk" : "Become a volunteer"}
+          accessibilityRole="button"
+          onPress={() => {
+            if (isVolunteer) {
+              router.push("/volunteer");
+            } else {
+              setVolunteerModalVisible(true);
+            }
+          }}
+          style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}
+        >
+          <View
+            style={[
+              styles.cardIconWrap,
+              isVolunteer ? styles.volunteerActiveIconWrap : styles.volunteerIconWrap,
+            ]}
+          >
+            <Ionicons
+              name={isVolunteer ? "shield-checkmark" : "people"}
+              size={20}
+              color={isVolunteer ? theme.colors.verified : theme.colors.primary}
+            />
+          </View>
+          <Text style={styles.actionCardTitle}>
+            {isVolunteer ? "Volunteer Hub" : "Join Ground Relief"}
+          </Text>
+          <Text style={styles.actionCardSub}>
+            {isVolunteer ? "Active tasks & supply transit" : "Help response coordinators"}
+          </Text>
+          <View
+            style={[
+              styles.volunteerTag,
+              isVolunteer && styles.volunteerTagActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.volunteerTagText,
+                isVolunteer && styles.volunteerTagActiveText,
+              ]}
+            >
+              {isVolunteer ? "VERIFIED RESPONDER" : "ENTER CAMP PIN"}
+            </Text>
+          </View>
+        </Pressable>
+      </View>
+
       <Modal
         animationType="slide"
         onRequestClose={closeVolunteerModal}
@@ -132,66 +212,63 @@ export default function EmergencyActions() {
                   <Ionicons name="people" size={22} color={theme.colors.primaryForeground} />
                 </View>
                 <Pressable
-                  accessibilityLabel="Close volunteer application"
-                  accessibilityRole="button"
+                  accessibilityLabel="Close modal"
+                  hitSlop={12}
                   onPress={closeVolunteerModal}
                   style={styles.closeButton}
                 >
                   <Ionicons name="close" size={20} color={theme.colors.mutedForeground} />
                 </Pressable>
               </View>
-              <Text style={styles.modalTitle}>Become a volunteer</Text>
+
+              <Text style={styles.modalTitle}>Volunteer Verification</Text>
               <Text style={styles.modalDescription}>
-                Enter the six-digit code shared by the relief camp coordinator.
+                Enter the 6-digit relief camp verification code provided by your on-site coordinator.
               </Text>
+
               {isRequestLoading ? (
                 <View style={styles.loadingBox}>
                   <ActivityIndicator color={theme.colors.primary} />
-                  <Text style={styles.loadingText}>Checking your application status...</Text>
+                  <Text style={styles.loadingText}>Checking verification status...</Text>
                 </View>
               ) : hasPendingRequest ? (
                 <View style={styles.successBox}>
                   <Ionicons name="time-outline" size={22} color={theme.colors.accent} />
                   <Text style={styles.successText}>
-                    Your application for {campName ?? "the selected camp"} is awaiting
-                    coordinator verification.
+                    Your application for {campName ?? "your relief camp"} is under review by the base coordinator.
                   </Text>
                 </View>
               ) : hasApprovedRequest ? (
                 <View style={styles.successBox}>
                   <Ionicons name="checkmark-circle" size={22} color={theme.colors.verified} />
                   <Text style={styles.successText}>
-                    You are approved as a volunteer for {campName ?? "the selected camp"}.
+                    You are verified for {campName ?? "your relief camp"}. You now have access to the field dispatch terminal.
                   </Text>
                 </View>
               ) : requestStatus === "rejected" ? (
                 <View style={styles.rejectedBox}>
                   <Ionicons name="close-circle" size={22} color={theme.colors.destructive} />
                   <Text style={styles.rejectedText}>
-                    Your previous application was not approved. You can apply again with a new code.
+                    Your request was not approved. Please speak directly with the relief base director.
                   </Text>
                 </View>
               ) : (
                 <>
-                  <Text style={styles.inputLabel}>Coordinator code</Text>
+                  <Text style={styles.inputLabel}>CAMP 6-DIGIT CODE</Text>
                   <TextInput
-                    accessibilityLabel="Coordinator code"
-                    editable={!isSubmitting}
+                    autoFocus
                     keyboardType="number-pad"
                     maxLength={6}
-                    onChangeText={(value) => {
-                      setCode(value.replace(/[^0-9]/g, ""));
-                      setErrorMessage(null);
-                    }}
-                    placeholder="000000"
+                    onChangeText={setCode}
+                    placeholder="123456"
                     placeholderTextColor={theme.colors.input}
                     style={styles.codeInput}
                     value={code}
                   />
+
                   {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
                   <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: code.length !== 6 || isSubmitting }}
                     disabled={code.length !== 6 || isSubmitting}
                     onPress={applyToVolunteer}
                     style={[
@@ -199,13 +276,15 @@ export default function EmergencyActions() {
                       (code.length !== 6 || isSubmitting) && styles.applyButtonDisabled,
                     ]}
                   >
-                    <Text style={styles.applyButtonText}>
-                      {isSubmitting ? "Applying..." : "Apply to volunteer"}
-                    </Text>
+                    {isSubmitting ? (
+                      <ActivityIndicator color={theme.colors.primaryForeground} />
+                    ) : (
+                      <Text style={styles.applyButtonText}>Verify & Join Base Force</Text>
+                    )}
                   </Pressable>
                 </>
               )}
-              {(hasPendingRequest || hasApprovedRequest || requestStatus === "rejected") ? (
+              {hasPendingRequest || hasApprovedRequest || requestStatus === "rejected" ? (
                 <Pressable onPress={closeVolunteerModal} style={styles.doneButton}>
                   <Text style={styles.doneButtonText}>Done</Text>
                 </Pressable>
@@ -214,74 +293,168 @@ export default function EmergencyActions() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    gap: 8,
+  container: {
     paddingHorizontal: 20,
-    marginBottom: 18,
-  },
-  actionButton: {
-    flex: 1,
-    minHeight: 64,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingHorizontal: 8,
-    borderWidth: theme.borderWidth,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.card,
+    marginBottom: 20,
   },
   sosButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginHorizontal: 20,
-    padding: 16,
-    borderWidth: theme.borderWidth,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.card,
     backgroundColor: theme.colors.destructive,
+    borderColor: "rgba(239, 68, 68, 0.4)",
+    borderRadius: 18,
+    borderWidth: 1,
+    elevation: 4,
+    marginBottom: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    shadowColor: theme.colors.destructive,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
   },
-  iconCircle: {
-    width: 38,
-    height: 38,
+  sosButtonPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.985 }],
+  },
+  sosContentRow: {
     alignItems: "center",
+    flexDirection: "row",
+    gap: 14,
+  },
+  sosIconCircle: {
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.22)",
+    borderRadius: 22,
+    height: 44,
     justifyContent: "center",
-    borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.24)",
+    width: 44,
   },
-  title: {
+  sosTextCol: {
+    flex: 1,
+  },
+  sosBadgeRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+    marginBottom: 2,
+  },
+  sosLiveDot: {
+    backgroundColor: "#ffffff",
+    borderRadius: 3,
+    height: 6,
+    width: 6,
+  },
+  sosEyebrow: {
+    color: "rgba(255, 255, 255, 0.88)",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.7,
+  },
+  sosTitle: {
     color: theme.colors.destructiveForeground,
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: -0.2,
   },
-  subtitle: {
-    marginTop: 2,
-    color: "rgba(255,255,255,0.86)",
+  sosSubtitle: {
+    color: "rgba(255, 255, 255, 0.86)",
     fontSize: 11,
+    marginTop: 2,
   },
-  reportButton: {
-    backgroundColor: theme.colors.accent,
+  sosArrowWrap: {
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.16)",
+    borderRadius: 16,
+    height: 32,
+    justifyContent: "center",
+    width: 32,
   },
-  reportTitle: {
-    color: theme.colors.accentForeground,
-    fontSize: 12,
-    fontWeight: "700",
-    textAlign: "center",
+  actionGrid: {
+    flexDirection: "row",
+    gap: 12,
   },
-  volunteerButton: {
-    backgroundColor: theme.colors.primary,
+  actionCard: {
+    backgroundColor: theme.colors.card,
+    borderColor: theme.colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    elevation: 2,
+    flex: 1,
+    padding: 15,
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
   },
-  volunteerTitle: {
-    color: theme.colors.primaryForeground,
-    fontSize: 12,
-    fontWeight: "700",
-    textAlign: "center",
+  actionCardPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
+  },
+  cardIconWrap: {
+    alignItems: "center",
+    borderRadius: 12,
+    height: 38,
+    justifyContent: "center",
+    marginBottom: 10,
+    width: 38,
+  },
+  reportIconWrap: {
+    backgroundColor: "rgba(234, 88, 12, 0.1)",
+  },
+  volunteerIconWrap: {
+    backgroundColor: "rgba(37, 99, 235, 0.1)",
+  },
+  volunteerActiveIconWrap: {
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+  },
+  actionCardTitle: {
+    color: theme.colors.foreground,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  actionCardSub: {
+    color: theme.colors.mutedForeground,
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 3,
+  },
+  reportTag: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(234, 88, 12, 0.08)",
+    borderRadius: 6,
+    marginTop: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  reportTagText: {
+    color: "#c2410c",
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+  },
+  volunteerTag: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(37, 99, 235, 0.08)",
+    borderRadius: 6,
+    marginTop: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  volunteerTagText: {
+    color: "#1d4ed8",
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+  },
+  volunteerTagActive: {
+    backgroundColor: "rgba(16, 185, 129, 0.1)",
+  },
+  volunteerTagActiveText: {
+    color: "#047857",
   },
   modalOverlay: {
     flex: 1,
@@ -292,45 +465,47 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0,0,0,0.42)",
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
   },
   modalCard: {
-    padding: 22,
-    paddingBottom: 32,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
     backgroundColor: theme.colors.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 36,
   },
   modalHeader: {
-    flexDirection: "row",
     alignItems: "center",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   modalIcon: {
-    width: 44,
-    height: 44,
     alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 22,
     backgroundColor: theme.colors.primary,
+    borderRadius: 22,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
   },
   closeButton: {
-    width: 36,
-    height: 36,
     alignItems: "center",
+    backgroundColor: theme.colors.muted,
+    borderRadius: 18,
+    height: 36,
     justifyContent: "center",
+    width: 36,
   },
   modalTitle: {
-    marginTop: 18,
     color: theme.colors.foreground,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
+    marginTop: 16,
   },
   modalDescription: {
-    marginTop: 6,
     color: theme.colors.mutedForeground,
     fontSize: 13,
     lineHeight: 19,
+    marginTop: 6,
   },
   inputLabel: {
     marginTop: 22,

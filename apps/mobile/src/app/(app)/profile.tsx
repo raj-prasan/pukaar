@@ -137,6 +137,17 @@ export default function ProfileScreen() {
               )}
             </Pressable>
 
+            {displayedProfile.role === "volunteer" || displayedProfile.role === "admin" ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push("/volunteer")}
+                style={styles.volunteerButton}
+              >
+                <Ionicons name="shield-checkmark" size={18} color={theme.colors.card} />
+                <Text style={styles.volunteerButtonText}>Open Volunteer Mission Desk</Text>
+              </Pressable>
+            ) : null}
+
             {message ? <Text style={styles.message}>{message}</Text> : null}
 
             <Pressable
@@ -259,6 +270,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 12,
     textAlign: "center",
+  },
+  volunteerButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.verified,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.control,
+    borderWidth: theme.borderWidth,
+    flexDirection: "row",
+    gap: 8,
+    height: 54,
+    justifyContent: "center",
+    marginTop: 14,
+  },
+  volunteerButtonText: {
+    color: theme.colors.card,
+    fontSize: 15,
+    fontWeight: "800",
   },
   signOutButton: {
     alignItems: "center",

@@ -1,16 +1,5 @@
-"use client";
-
-import { OrganizationSwitcher, SignInButton, UserButton } from "@clerk/nextjs";
-
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-svh">
-      <p>app/web</p>
-      <UserButton/>
-      <OrganizationSwitcher hidePersonal/>
-    </div>
-  );
+  redirect("/dashboard");
 }
-
-

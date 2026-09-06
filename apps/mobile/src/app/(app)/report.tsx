@@ -1,10 +1,11 @@
-  import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "@clerk/expo";
 import { CameraView, useCameraPermissions, type CameraCapturedPicture } from "expo-camera";
-  import { Blob as ExpoBlob } from "expo-blob";
-  import { useMutation } from "convex/react";
+import * as FileSystem from "expo-file-system/legacy";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -48,7 +49,7 @@ type IncidentPayload = {
     uri: string;
     width: number;
     height: number;
-    format: string;
+    format?: string;
   };
   createdAt: string;
 };
@@ -72,8 +73,24 @@ const severities: Array<{ value: ReportSeverity; label: string }> = [
   { value: "critical", label: "Critical" },
 ];
 
+function formatTimeAgo(timestamp: number): string {
+  const diffMs = Date.now() - timestamp;
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+}
+
+// Module-level cache to eliminate flicker during Convex revalidations
+let cachedGlobalSimilarCheck: Record<string, any> = {};
+
 export default function ReportScreen() {
   const router = useRouter();
+  const { isLoaded, isSignedIn } = useAuth();
+  const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
   const cameraRef = useRef<CameraView>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [category, setCategory] = useState<IncidentCategory | null>(null);
@@ -91,6 +108,122 @@ export default function ReportScreen() {
   const [payload, setPayload] = useState<IncidentPayload | null>(null);
   const createReport = useMutation(api.public.reports.createReport);
   const generateUploadUrl = useMutation(api.public.files.generateUploadUrl);
+
+  // Stabilize coordinates to 3 decimal places (~100m) to prevent microscopic GPS sensor jitter from re-triggering queries
+  const stableCoords = useMemo(() => {
+    if (latitude === null || longitude === null) return null;
+    return {
+      lat: Math.round(latitude * 1000) / 1000,
+      lon: Math.round(longitude * 1000) / 1000,
+    };
+  }, [latitude, longitude]);
+
+  const cacheKey =
+    category && stableCoords ? `${category}_${stableCoords.lat}_${stableCoords.lon}` : "";
+
+  // Skip query while submitting, after submit, or until Convex auth is ready
+  const similarCheckQueryArgs = useMemo(() => {
+    if (isSubmitting || payload) return "skip" as const;
+    if (!isLoaded || !isSignedIn || !isConvexAuthenticated || !category || !stableCoords) {
+      return "skip" as const;
+    }
+    return {
+      category,
+      latitude: stableCoords.lat,
+      longitude: stableCoords.lon,
+    };
+  }, [isSubmitting, payload, isLoaded, isSignedIn, isConvexAuthenticated, category, stableCoords]);
+
+  const similarCheck = useQuery(
+    api.public.reports.checkSimilarReportsAndIncidents,
+    similarCheckQueryArgs
+  );
+
+  const lastSimilarCheck = useRef<any>(null);
+
+  // Synchronize lastSimilarCheck with cacheKey change
+  useEffect(() => {
+    lastSimilarCheck.current = cacheKey ? cachedGlobalSimilarCheck[cacheKey] ?? null : null;
+  }, [cacheKey]);
+
+  // Update cached state when not submitting and not submitted
+  useEffect(() => {
+    if (isSubmitting || payload || !similarCheck || !cacheKey) {
+      return;
+    }
+
+    const prev = cachedGlobalSimilarCheck[cacheKey];
+    // Safeguard: Once duplicate or incident is found for this key, never let transient queries flip them to false
+    const merged = prev
+      ? {
+          ...similarCheck,
+          hasSimilarIncident: Boolean(similarCheck.hasSimilarIncident || prev.hasSimilarIncident),
+          hasUserDuplicate: Boolean(similarCheck.hasUserDuplicate || prev.hasUserDuplicate),
+          hasSimilarReport: Boolean(similarCheck.hasSimilarReport || prev.hasSimilarReport),
+          similarIncidents:
+            similarCheck.similarIncidents && similarCheck.similarIncidents.length > 0
+              ? similarCheck.similarIncidents
+              : prev.similarIncidents ?? [],
+          userReports:
+            similarCheck.userReports && similarCheck.userReports.length > 0
+              ? similarCheck.userReports
+              : prev.userReports ?? [],
+          similarReports:
+            similarCheck.similarReports && similarCheck.similarReports.length > 0
+              ? similarCheck.similarReports
+              : prev.similarReports ?? [],
+        }
+      : similarCheck;
+
+    cachedGlobalSimilarCheck[cacheKey] = merged;
+    lastSimilarCheck.current = merged;
+  }, [isSubmitting, payload, similarCheck, cacheKey]);
+
+  const cachedData = cacheKey ? cachedGlobalSimilarCheck[cacheKey] : null;
+
+  // Active similar data: completely freeze while submitting or if payload exists
+  const activeSimilar = useMemo(() => {
+    if (payload) return null;
+    if (isSubmitting) {
+      return cachedData ?? lastSimilarCheck.current;
+    }
+
+    const current = similarCheck ?? cachedData ?? lastSimilarCheck.current;
+    if (!current) return null;
+
+    if (cachedData) {
+      return {
+        ...current,
+        hasSimilarIncident: Boolean(current.hasSimilarIncident || cachedData.hasSimilarIncident),
+        hasUserDuplicate: Boolean(current.hasUserDuplicate || cachedData.hasUserDuplicate),
+        hasSimilarReport: Boolean(current.hasSimilarReport || cachedData.hasSimilarReport),
+        similarIncidents:
+          current.similarIncidents && current.similarIncidents.length > 0
+            ? current.similarIncidents
+            : cachedData.similarIncidents ?? [],
+        userReports:
+          current.userReports && current.userReports.length > 0
+            ? current.userReports
+            : cachedData.userReports ?? [],
+        similarReports:
+          current.similarReports && current.similarReports.length > 0
+            ? current.similarReports
+            : cachedData.similarReports ?? [],
+      };
+    }
+
+    return current;
+  }, [payload, isSubmitting, similarCheck, cachedData]);
+
+  const hasUserDuplicate = Boolean(activeSimilar?.hasUserDuplicate);
+  const hasSimilarIncident = Boolean(activeSimilar?.hasSimilarIncident);
+  const hasSimilarReport = Boolean(activeSimilar?.hasSimilarReport);
+  const hasBoth = hasUserDuplicate && hasSimilarIncident;
+  const showWarning = Boolean(
+    !payload &&
+    activeSimilar &&
+    (hasUserDuplicate || hasSimilarIncident || hasSimilarReport)
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -150,7 +283,7 @@ export default function ReportScreen() {
     }
 
     try {
-      const capturedPhoto = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+      const capturedPhoto = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       if (capturedPhoto) {
         setPhoto(capturedPhoto);
         setIsCameraOpen(false);
@@ -160,7 +293,8 @@ export default function ReportScreen() {
     }
   }
 
-  async function handleSubmit() {
+  async function executeSubmit(attachedIncidentId?: Id<"incidents">) {
+    if (isSubmitting) return;
     if (!category || !address.trim() || latitude === null || longitude === null || !photo) {
       Alert.alert(
         "Complete the report",
@@ -174,23 +308,42 @@ export default function ReportScreen() {
     setMessage(null);
 
     try {
-      const photoResponse = await fetch(photo.uri);
-      const photoBlob = new ExpoBlob([await photoResponse.arrayBuffer()], {
-        type: photo.format ? `image/${photo.format}` : "image/jpeg",
-      });
       const uploadUrl = await generateUploadUrl();
-      const uploadResponse = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": photoBlob.type || "image/jpeg" },
-        body: photoBlob as unknown as Blob,
-      });
+      let storageId: Id<"_storage">;
 
-      if (!uploadResponse.ok) {
-        const responseText = await uploadResponse.text();
-        throw new Error(responseText || "Unable to upload the report photo");
+      if (Platform.OS === "web") {
+        const photoResponse = await fetch(photo.uri);
+        const photoBlob = await photoResponse.blob();
+        const uploadResponse = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": photoBlob.type || "image/jpeg" },
+          body: photoBlob,
+        });
+
+        if (!uploadResponse.ok) {
+          const responseText = await uploadResponse.text();
+          throw new Error(responseText || "Unable to upload the report photo");
+        }
+
+        const data = (await uploadResponse.json()) as { storageId: Id<"_storage"> };
+        storageId = data.storageId;
+      } else {
+        const uploadResult = await FileSystem.uploadAsync(uploadUrl, photo.uri, {
+          httpMethod: "POST",
+          uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+          headers: {
+            "Content-Type": "image/jpeg",
+          },
+        });
+
+        if (uploadResult.status < 200 || uploadResult.status >= 300) {
+          throw new Error(`Upload failed (${uploadResult.status}): ${uploadResult.body}`);
+        }
+
+        const data = JSON.parse(uploadResult.body) as { storageId: Id<"_storage"> };
+        storageId = data.storageId;
       }
 
-      const { storageId } = (await uploadResponse.json()) as { storageId: Id<"_storage"> };
       await createReport({
         category,
         title: selectedCategory?.label ?? category,
@@ -201,6 +354,7 @@ export default function ReportScreen() {
         ...(locationAccuracy ? { locationAccuracy } : {}),
         address: address.trim(),
         imageStorageId: storageId,
+        ...(attachedIncidentId ? { incidentId: attachedIncidentId } : {}),
       });
 
       setPayload({
@@ -219,12 +373,109 @@ export default function ReportScreen() {
         },
         createdAt: new Date().toISOString(),
       });
-      setMessage("Report submitted for review.");
+      setMessage(
+        attachedIncidentId
+          ? "Report submitted and linked to corroborate existing incident."
+          : "Report submitted for review."
+      );
     } catch (caughtError) {
       setMessage(caughtError instanceof Error ? caughtError.message : "Unable to submit the report.");
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function handleCancel() {
+    Alert.alert(
+      "Cancel report?",
+      "Are you sure you want to discard this report and return to the home screen?",
+      [
+        { text: "Keep Editing", style: "cancel" },
+        { text: "Yes, Cancel", style: "destructive", onPress: () => router.back() },
+      ]
+    );
+  }
+
+  function handleSubmit() {
+    if (isSubmitting) return;
+    if (!category || !address.trim() || latitude === null || longitude === null || !photo) {
+      Alert.alert(
+        "Complete the report",
+        "Select an incident type, enter the location, capture GPS coordinates, and add a photo.",
+      );
+      return;
+    }
+
+    const selectedCategory = categories.find((item) => item.value === category);
+
+    // 1. Same user duplicate check
+    if (activeSimilar?.hasUserDuplicate && activeSimilar.userReports.length > 0) {
+      const existing = activeSimilar.userReports[0];
+      const hasInc = activeSimilar.hasSimilarIncident && activeSimilar.similarIncidents.length > 0;
+      const inc = hasInc ? activeSimilar.similarIncidents[0] : null;
+
+      Alert.alert(
+        "Duplicate Report Warning",
+        `You previously submitted a report for a ${selectedCategory?.label ?? category} nearby (${existing.distanceKm} km away) on ${formatTimeAgo(existing.createdAt)}.${hasInc ? ` Responders are also tracking an active incident ("${inc?.title}").` : ""}\n\nDo you want to cancel or submit anyway?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          ...(hasInc && inc
+            ? [
+                {
+                  text: "Corroborate Incident",
+                  onPress: () => void executeSubmit(inc._id),
+                },
+              ]
+            : []),
+          {
+            text: "Submit Anyway",
+            style: "destructive",
+            onPress: () => void executeSubmit(),
+          },
+        ]
+      );
+      return;
+    }
+
+    // 2. Similar active incident check
+    if (activeSimilar?.hasSimilarIncident && activeSimilar.similarIncidents.length > 0) {
+      const inc = activeSimilar.similarIncidents[0];
+      Alert.alert(
+        "Similar Incident Nearby",
+        `An active incident ("${inc.title}") is already registered ${inc.distanceKm} km away.\n\nDo you want to cancel or submit this report to corroborate it?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Corroborate Incident",
+            onPress: () => void executeSubmit(inc._id),
+          },
+          {
+            text: "Submit as New",
+            onPress: () => void executeSubmit(),
+          },
+        ]
+      );
+      return;
+    }
+
+    // 3. Similar community report check
+    if (activeSimilar?.hasSimilarReport && activeSimilar.similarReports.length > 0) {
+      const rep = activeSimilar.similarReports[0];
+      Alert.alert(
+        "Similar Report Found Nearby",
+        `Another report for ${selectedCategory?.label ?? category} was recently filed ${rep.distanceKm} km away.\n\nDo you want to cancel or submit anyway?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Submit Anyway",
+            onPress: () => void executeSubmit(),
+          },
+        ]
+      );
+      return;
+    }
+
+    void executeSubmit();
   }
 
   return (
@@ -326,10 +577,223 @@ export default function ReportScreen() {
           </Pressable>
         )}
 
+        {/* Warning when duplicate or similar incident is found */}
+        {showWarning && (
+          <View
+            style={[
+              styles.warningCard,
+              hasBoth || hasUserDuplicate
+                ? styles.warningCardDuplicate
+                : hasSimilarIncident
+                ? styles.warningCardIncident
+                : styles.warningCardReport,
+            ]}
+          >
+            <View style={styles.warningHeader}>
+              <View style={styles.warningTitleRow}>
+                <Ionicons
+                  name={
+                    hasBoth || hasUserDuplicate
+                      ? "alert-circle"
+                      : hasSimilarIncident
+                      ? "warning"
+                      : "information-circle"
+                  }
+                  size={22}
+                  color={
+                    hasBoth || hasUserDuplicate
+                      ? theme.colors.destructive
+                      : theme.colors.accent
+                  }
+                />
+                <Text style={styles.warningTitle}>
+                  {hasBoth
+                    ? "You reported this & active incident ongoing"
+                    : hasUserDuplicate
+                    ? "You already reported this incident"
+                    : hasSimilarIncident
+                    ? "Similar incident already reported nearby"
+                    : "Similar report already present nearby"}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.warningBadge,
+                  hasBoth || hasUserDuplicate
+                    ? styles.warningBadgeDuplicate
+                    : styles.warningBadgeIncident,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.warningBadgeText,
+                    hasBoth || hasUserDuplicate
+                      ? styles.warningBadgeTextDuplicate
+                      : styles.warningBadgeTextIncident,
+                  ]}
+                >
+                  {hasBoth
+                    ? "Duplicate & Active Incident"
+                    : hasUserDuplicate
+                    ? "Duplicate"
+                    : hasSimilarIncident
+                    ? "Existing Incident"
+                    : "Community Report"}
+                </Text>
+              </View>
+            </View>
+
+            {/* If user reported before: show their previous report */}
+            {hasUserDuplicate && activeSimilar.userReports[0] && (
+              <View style={styles.warningBody}>
+                <Text style={styles.warningDescription}>
+                  You previously submitted a report for a{" "}
+                  <Text style={styles.warningHighlight}>
+                    {categories.find((c) => c.value === category)?.label ?? category}
+                  </Text>{" "}
+                  approximately {activeSimilar.userReports[0].distanceKm} km from here (
+                  {formatTimeAgo(activeSimilar.userReports[0].createdAt)}).
+                </Text>
+                <View style={styles.warningDetailBox}>
+                  <Text style={styles.warningDetailTitle}>
+                    {activeSimilar.userReports[0].title}
+                  </Text>
+                  {activeSimilar.userReports[0].address && (
+                    <Text style={styles.warningDetailSub}>
+                      📍 {activeSimilar.userReports[0].address}
+                    </Text>
+                  )}
+                  <Text style={styles.warningDetailStatus}>
+                    Status:{" "}
+                    <Text style={styles.warningStatusValue}>
+                      {activeSimilar.userReports[0].verificationStatus.toUpperCase()}
+                    </Text>
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* If there is an active incident nearby: show incident details */}
+            {hasSimilarIncident && activeSimilar.similarIncidents[0] && (
+              <View style={styles.warningBody}>
+                <Text style={styles.warningDescription}>
+                  {hasBoth
+                    ? "An official incident is also actively being tracked by responders nearby:"
+                    : `Responders are actively tracking an incident matching this type ${activeSimilar.similarIncidents[0].distanceKm} km from your current location:`}
+                </Text>
+                <View style={styles.warningDetailBox}>
+                  <Text style={styles.warningDetailTitle}>
+                    {activeSimilar.similarIncidents[0].title}
+                  </Text>
+                  {activeSimilar.similarIncidents[0].address && (
+                    <Text style={styles.warningDetailSub}>
+                      📍 {activeSimilar.similarIncidents[0].address}
+                    </Text>
+                  )}
+                  <View style={styles.incidentMetaRow}>
+                    <Text style={styles.warningDetailMeta}>
+                      Status:{" "}
+                      <Text style={styles.warningStatusValue}>
+                        {activeSimilar.similarIncidents[0].status.replace("_", " ").toUpperCase()}
+                      </Text>
+                    </Text>
+                    <Text style={styles.warningDetailMeta}>
+                      Priority:{" "}
+                      <Text style={styles.warningStatusValue}>
+                        {activeSimilar.similarIncidents[0].priority.toUpperCase()}
+                      </Text>
+                    </Text>
+                    {activeSimilar.similarIncidents[0].reportCount > 0 && (
+                      <Text style={styles.warningDetailMeta}>
+                        Reports: {activeSimilar.similarIncidents[0].reportCount}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* If only community report nearby */}
+            {!hasUserDuplicate &&
+              !hasSimilarIncident &&
+              hasSimilarReport &&
+              activeSimilar.similarReports[0] && (
+                <View style={styles.warningBody}>
+                  <Text style={styles.warningDescription}>
+                    {activeSimilar.similarReports.length} other report(s) for{" "}
+                    <Text style={styles.warningHighlight}>
+                      {categories.find((c) => c.value === category)?.label ?? category}
+                    </Text>{" "}
+                    were recently submitted nearby (closest: {activeSimilar.similarReports[0].distanceKm} km away,{" "}
+                    {formatTimeAgo(activeSimilar.similarReports[0].createdAt)}).
+                  </Text>
+                  <View style={styles.warningDetailBox}>
+                    <Text style={styles.warningDetailTitle}>
+                      {activeSimilar.similarReports[0].title}
+                    </Text>
+                    {activeSimilar.similarReports[0].address && (
+                      <Text style={styles.warningDetailSub}>
+                        📍 {activeSimilar.similarReports[0].address}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+
+            <Text style={styles.warningSubText}>
+              {hasBoth
+                ? "Emergency response teams already have your report, and responders are active on site. You can cancel, or corroborate with additional details."
+                : hasUserDuplicate
+                ? "Emergency response teams already have your report. You do not need to report again unless conditions have changed significantly."
+                : hasSimilarIncident
+                ? "You can cancel if it is the exact same situation, or submit to corroborate with additional photos and details."
+                : "You can cancel if this covers what you observed, or submit if you have further information."}
+            </Text>
+
+            {/* Inline Action Options */}
+            <View style={styles.warningActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={handleCancel}
+                style={styles.warningCancelButton}
+              >
+                <Ionicons name="close-circle-outline" size={18} color={theme.colors.foreground} />
+                <Text style={styles.warningCancelButtonText}>Cancel report</Text>
+              </Pressable>
+
+              {hasSimilarIncident && activeSimilar.similarIncidents[0] ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isSubmitting}
+                  onPress={() => void executeSubmit(activeSimilar.similarIncidents[0]._id)}
+                  style={styles.warningSubmitButton}
+                >
+                  <Text style={styles.warningSubmitButtonText}>
+                    {isSubmitting ? "Submitting..." : "Corroborate Incident"}
+                  </Text>
+                  <Ionicons name="arrow-forward" size={16} color={theme.colors.primaryForeground} />
+                </Pressable>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isSubmitting}
+                  onPress={() => void executeSubmit()}
+                  style={[styles.warningSubmitButton, styles.warningSubmitButtonDuplicate]}
+                >
+                  <Text style={styles.warningSubmitButtonText}>
+                    {isSubmitting ? "Submitting..." : "Submit anyway"}
+                  </Text>
+                  <Ionicons name="arrow-forward" size={16} color={theme.colors.primaryForeground} />
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
+
         <Pressable
           accessibilityRole="button"
           disabled={isSubmitting}
-          onPress={() => void handleSubmit()}
+          onPress={() => handleSubmit()}
           style={styles.submitButton}
         >
           <Text style={styles.submitButtonText}>
@@ -584,5 +1048,167 @@ const styles = StyleSheet.create({
     fontFamily: "monospace",
     fontSize: 11,
     lineHeight: 16,
+  },
+  warningCard: {
+    marginTop: 24,
+    padding: 16,
+    borderRadius: theme.radius.card,
+    borderWidth: 1.5,
+    backgroundColor: theme.colors.card,
+  },
+  warningCardDuplicate: {
+    borderColor: theme.colors.destructive,
+    backgroundColor: "#fff8f8",
+  },
+  warningCardIncident: {
+    borderColor: theme.colors.accent,
+    backgroundColor: "#fffdf5",
+  },
+  warningCardReport: {
+    borderColor: "#3b82f6",
+    backgroundColor: "#f8faff",
+  },
+  warningHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+    marginBottom: 10,
+  },
+  warningTitleRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  warningTitle: {
+    flex: 1,
+    color: theme.colors.foreground,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  warningBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.muted,
+  },
+  warningBadgeDuplicate: {
+    backgroundColor: theme.colors.destructive,
+  },
+  warningBadgeIncident: {
+    backgroundColor: theme.colors.accent,
+  },
+  warningBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  warningBadgeTextDuplicate: {
+    color: theme.colors.destructiveForeground,
+  },
+  warningBadgeTextIncident: {
+    color: theme.colors.accentForeground,
+  },
+  warningBody: {
+    marginTop: 4,
+  },
+  warningDescription: {
+    color: theme.colors.foreground,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  warningHighlight: {
+    fontWeight: "700",
+  },
+  warningDetailBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: theme.radius.card,
+    backgroundColor: "rgba(0, 0, 0, 0.04)",
+    borderWidth: theme.borderWidth,
+    borderColor: "rgba(0, 0, 0, 0.1)",
+  },
+  warningDetailTitle: {
+    color: theme.colors.foreground,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  warningDetailSub: {
+    marginTop: 3,
+    color: theme.colors.mutedForeground,
+    fontSize: 12,
+  },
+  warningDetailStatus: {
+    marginTop: 4,
+    color: theme.colors.mutedForeground,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  warningDetailMeta: {
+    color: theme.colors.mutedForeground,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  warningStatusValue: {
+    color: theme.colors.foreground,
+    fontWeight: "800",
+  },
+  incidentMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginTop: 6,
+  },
+  warningSubText: {
+    marginTop: 10,
+    color: theme.colors.mutedForeground,
+    fontSize: 12,
+    lineHeight: 16,
+    fontStyle: "italic",
+  },
+  warningActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0, 0, 0, 0.08)",
+  },
+  warningCancelButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 42,
+    borderWidth: theme.borderWidth,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.card,
+    backgroundColor: theme.colors.card,
+  },
+  warningCancelButtonText: {
+    color: theme.colors.foreground,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  warningSubmitButton: {
+    flex: 1.2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 42,
+    borderRadius: theme.radius.card,
+    backgroundColor: theme.colors.primary,
+  },
+  warningSubmitButtonDuplicate: {
+    backgroundColor: theme.colors.foreground,
+  },
+  warningSubmitButtonText: {
+    color: theme.colors.primaryForeground,
+    fontSize: 13,
+    fontWeight: "700",
   },
 });

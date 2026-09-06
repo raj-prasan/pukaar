@@ -9,6 +9,7 @@ import {
   CheckCircle,
   ClipboardList,
   Clock,
+  Download,
   ExternalLink,
   FileText,
   History,
@@ -65,6 +66,28 @@ export default function IncidentDetailPage() {
     date: number;
     description?: string;
   } | null>(null);
+  const [downloadingImage, setDownloadingImage] = useState(false);
+
+  const handleDownloadImage = async (url: string, filename: string) => {
+    try {
+      setDownloadingImage(true);
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename || "incident-evidence.jpg";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(blobUrl);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error("Failed to download image", err);
+      window.open(url, "_blank");
+    } finally {
+      setDownloadingImage(false);
+    }
+  };
 
   // Task & Dispatch modal state
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -871,6 +894,22 @@ export default function IncidentDetailPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleDownloadImage(
+                        selectedImage.url,
+                        `${selectedImage.title.toLowerCase().replace(/[^a-z0-9]/g, "_")}_evidence.jpg`,
+                      )
+                    }
+                    disabled={downloadingImage}
+                    className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 border border-border hover:bg-muted text-foreground transition-colors font-semibold disabled:opacity-50"
+                  >
+                    <Download className="size-3.5" />
+                    <span className="hidden sm:inline">
+                      {downloadingImage ? "Saving..." : "Save Image"}
+                    </span>
+                  </button>
                   <a
                     href={selectedImage.url}
                     target="_blank"
